@@ -91,9 +91,9 @@ protected:
 
 int main( int argc, char** argv )
 {
-    mew::Mew m( 2 );
+    mew::Mew m( 0 );
     m.subscribe( "popo", popo1 );
-    m.timer( test_timer, 1000000 );
+    m.timer( test_timer, 0.01 );
 
     mew::Mew* mm = &m;
 
@@ -102,7 +102,7 @@ int main( int argc, char** argv )
         while(true)
         {
             mm->push( "popo", k++ );
-            usleep(150);
+            usleep(1500);
         }
     }};
 

@@ -12,8 +12,8 @@ public:
     }
 
     double elapsed() const {
-        return std::chrono::duration_cast<std::chrono::microseconds>(
-                clock_::now() - m_beg).count();
+        return (std::chrono::duration_cast<std::chrono::microseconds>(
+                clock_::now() - m_beg).count()) / 1000000.0;
     }
 
 private:
