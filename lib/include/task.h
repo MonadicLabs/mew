@@ -15,7 +15,8 @@ public:
     {
         NONE=0,
         DATA,
-        TIMER
+        TIMER,
+        IO
     } Type;
 
     Task( Type type = NONE )
@@ -63,8 +64,8 @@ private:
 class TimerTask : public Task
 {
 public:
-    TimerTask( std::function<void(double)> f )
-        :Task(TIMER), _f(f)
+    TimerTask( std::function<void(double)> f, double triggerTime )
+        :Task(TIMER), _f(f), _triggerTime(triggerTime)
     {
 
     }
@@ -88,8 +89,32 @@ public:
     }
 
     std::function<void(double)> _f;
+    double _triggerTime;
 
 private:
+
+};
+
+class IOTask : public Task
+{
+public:
+    IOTask( std::function<void(int)> f, int fd )
+        :Task(IO), _f(f), _fd(fd)
+    {
+
+    }
+
+    virtual ~IOTask()
+    {
+
+    }
+
+    std::function<void(int)> _f;
+    int _fd;
+
+private:
+
+protected:
 
 };
 

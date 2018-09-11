@@ -8,6 +8,13 @@ using namespace std;
 
 #include <mew.h>
 
+#include <arpa/inet.h>
+#include <netinet/in.h>
+#include <stdio.h>
+#include <sys/types.h>
+#include <sys/socket.h>
+#include <unistd.h>
+#include <cstring>
 
 void popo1( int q )
 {
@@ -26,8 +33,7 @@ void popo2( test_struct str )
 
 void test_timer( double gt )
 {
-    cerr << "lkgjkdfgjdklgj" << endl;
-    cerr << "tick t=" << gt << endl;
+//    cerr << "***** tick t=" << gt << endl;
 }
 
 /*
@@ -89,20 +95,48 @@ protected:
 };
 */
 
+void process_io( int fd )
+{
+    cerr << "cocou" << endl;
+    char buf[1024];
+    int rr = read( fd, buf, 1024 );
+    cerr << "read " << rr << "bytes " << endl;
+}
+
 int main( int argc, char** argv )
 {
-    mew::Mew m( 0 );
-    m.subscribe( "popo", popo1 );
-    m.timer( test_timer, 0.01 );
-
+    mew::Mew m( 1 );
+    // m.subscribe( "popo", popo1 );
+    m.timer( test_timer, 0.0001 );
     mew::Mew* mm = &m;
+
+    // UDP TEST
+#define BUFLEN 512
+#define NPACK 10
+#define PORT 9940
+    struct sockaddr_in si_me, si_other;
+    int s, i, slen=sizeof(si_other);
+    char buf[BUFLEN];
+
+    if ((s=socket(AF_INET, SOCK_DGRAM, IPPROTO_UDP))==-1)
+        //diep("socket");
+        cerr << ":( socket." << endl;
+
+    memset((char *) &si_me, 0, sizeof(si_me));
+    si_me.sin_family = AF_INET;
+    si_me.sin_port = htons(PORT);
+    si_me.sin_addr.s_addr = htonl(INADDR_ANY);
+    if (::bind(s, (const sockaddr*)(&si_me), sizeof(si_me))==-1)
+        cerr << ":( bind" << endl;
+    m.io( process_io, s );
+    //
 
     thread worker = thread{[mm](){
         int k = 0;
         while(true)
         {
-            mm->push( "popo", k++ );
-            usleep(1500);
+//            mm->push( "popo", k++ );
+            usleep(150000);
         }
     }};
 

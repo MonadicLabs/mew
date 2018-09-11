@@ -5,6 +5,9 @@
 #include <map>
 #include <vector>
 #include <chrono>
+#include <limits>
+
+#include <poll.h>
 
 #include "singleton.h"
 #include "any.h"
@@ -23,7 +26,7 @@ public:
     Worker( Mew* m )
         :_parent(m)
     {
-
+        cerr << "Worker. Reporting in !" << endl;
     }
 
     virtual ~Worker()
@@ -39,7 +42,7 @@ public:
         }
     }
 
-    virtual void tick();
+    virtual void tick( int64_t timeout_s = 0 );
 
 private:
     mew::Mew * _parent;
@@ -57,6 +60,7 @@ public:
     Mew( size_t additionalWorkerNum = 0 )
         :Worker(this)
     {
+        _minTimerValue = std::numeric_limits<double>::max();
         for( size_t i = 0; i < additionalWorkerNum; ++i )
         {
             // Add a new worker.
@@ -74,12 +78,53 @@ public:
     {
         for( TimerReference& tref : _timerRefs )
         {
-            // cerr << "t_elapsed=" << tref.t.elapsed() << endl;
-            if( tref.t.elapsed() >= tref.dt_usec )
+            if( tref.t.elapsed() > tref.dt_sec )
             {
-                Task * tt = new TimerTask( tref.f );
+                double latencyRatio = fabs((tref.t.elapsed() - tref.dt_sec) / tref.dt_sec);
+//                cerr << "latencyRatio" << latencyRatio << endl;
+                if( latencyRatio >= 0.2 )
+                {
+                    cerr << "t_elapsed=" << tref.t.elapsed() << "requested: " << tref.dt_sec << endl;
+                    cerr << "/!\\ latency_ratio=" << latencyRatio << endl;
+                }
+//                cerr << "appapap=" << approach << endl;
+                Task * tt = new TimerTask( tref.f, globalTime() );
                 _taskQueue.enqueue( tt );
                 tref.t.reset();
+            }
+        }
+    }
+
+    void processIO()
+    {
+        std::vector<struct pollfd> pfds;
+        std::map< int, std::function<void(int)> > _callbacks;
+        for( IOSubscriptionReference& ioref : _ioRefs )
+        {
+            pfds.push_back({ ioref.fd, POLLIN, 0} );
+            _callbacks.insert( make_pair( ioref.fd, ioref.f ) );
+        }
+        int ret = ::poll(&pfds[0], pfds.size(), 1000);
+        if(ret < 0){
+            // TODO
+            // throw std::runtime_error(std::string("poll: ") + std::strerror(errno));
+            cerr << "poll ERRROR!" << endl;
+        }
+        else if( ret == 0 )
+        {
+            cerr << "timeout !" << endl;
+        }
+        else
+        {
+            for( struct pollfd &p : pfds)
+            {
+                if(p.revents == POLLIN)
+                {
+                    cerr << "data ready ?" << endl;
+                    p.revents = 0;
+                    _taskQueue.enqueue( new IOTask( _callbacks[ p.fd ], p.fd ) );
+                }
+
             }
         }
     }
@@ -97,35 +142,15 @@ public:
         while(true)
         {
             processTimers();
-            Worker::tick();
+//            if( _minTimerValue >= 0.005 )
+//            {
+//                Worker::tick( _minTimerValue / 100.0 );
+//            }
+//            else
+//            {
+//                usleep(10);
+//            }
         }
-
-        /*
-        Task * t;
-        while(true)
-        {
-            // Wait for IO tasks
-            if( _ioQueue.try_dequeue(t) )
-            {
-                // Do something
-                switch( t->type() )
-                {
-                case Task::TIMER:
-                {
-                    break;
-                }
-
-                default:
-                    break;
-                }
-
-                // Destroy task
-                delete t;
-            }
-
-            Worker::tick();
-        }
-        */
 
     }
 
@@ -176,14 +201,20 @@ public:
     }
 
     template<typename R, typename Arg>
-    void timer( std::function<R(Arg)> f, double dt_usec )
+    void timer( std::function<R(Arg)> f, double dt_sec )
     {
         cerr << "timer std::function" << endl;
         TimerReference tref;
-        tref.dt_usec = dt_usec;
+        tref.dt_sec = dt_sec;
+        tref.approach = std::numeric_limits<double>::max();
         tref.f = f;
-        f( 12345 );
         tref.t.reset();
+
+        if( _minTimerValue > dt_sec )
+        {
+            _minTimerValue = dt_sec;
+        }
+
         _timerRefs.push_back( tref );
     }
 
@@ -210,6 +241,24 @@ public:
         }
     }
 
+    template<typename R, typename Arg>
+    void io( R (*fptr)(Arg), int filedescriptor )
+    {
+        cerr << "io fptr" << endl;
+        std::function<R(Arg)> f = static_cast<std::function<R(Arg)> >(fptr);
+        this->io( f, filedescriptor );
+    }
+
+    template<typename R, typename Arg>
+    void io( std::function<R(Arg)> f, int filedescriptor )
+    {
+        cerr << "io std::function" << endl;
+        IOSubscriptionReference ioref;
+        ioref.fd = filedescriptor;
+        ioref.f = f;
+        _ioRefs.push_back( ioref );
+    }
+
     double globalTime()
     {
         return _globalTimer.elapsed();
@@ -225,30 +274,45 @@ private:
 
     typedef struct
     {
+        std::function<void(int)> f;
+        int fd;
+    } IOSubscriptionReference;
+
+    typedef struct
+    {
         Timer t;
-        double dt_usec;
+        double dt_sec;
+        double approach;
         std::function<void(double)> f;
     } TimerReference;
 
     std::map< std::string, std::vector< SubscriptionReference > > _subscriptions;
-    std::vector< TimerReference > _timerRefs;
+    std::vector< IOSubscriptionReference > _ioRefs;
 
     // Task queues
     moodycamel::BlockingConcurrentQueue<mew::Task*> _taskQueue;
-//    moodycamel::BlockingConcurrentQueue<mew::Task*> _ioQueue;
+    //    moodycamel::BlockingConcurrentQueue<mew::Task*> _ioQueue;
 
     // Workers
     std::vector< Worker * > _workers;
 
-    // Global timer
+    // Timers & Global timer
     Timer _globalTimer;
+    std::vector< TimerReference > _timerRefs;
+    double _minTimerValue;
+
 
 };
 
-void Worker::tick()
+void Worker::tick(int64_t timeout_s)
 {
     Task * t = nullptr;
-    _parent->_taskQueue.wait_dequeue(t);
+
+    if( timeout_s > 0 )
+        _parent->_taskQueue.wait_dequeue(t);
+    else
+        _parent->_taskQueue.wait_dequeue_timed(t, timeout_s * 1000000);
+
     if( t )
     {
         switch( t->type() )
@@ -266,6 +330,14 @@ void Worker::tick()
             TimerTask * tt = (TimerTask*)t;
             double globalTime = _parent->globalTime();
             tt->_f( globalTime );
+            break;
+        }
+
+        case Task::IO:
+        {
+            IOTask * iot = (IOTask*)t;
+            cerr << "calling io." << endl;
+            iot->_f( iot->_fd );
             break;
         }
 
