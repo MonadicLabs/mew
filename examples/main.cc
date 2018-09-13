@@ -29,11 +29,13 @@ typedef struct
 void popo2( test_struct str )
 {
     cerr << "popo2=" << endl;
+    usleep(1000);
 }
 
 void test_timer( double gt )
 {
-//    cerr << "***** tick t=" << gt << endl;
+    cerr << "***** tick t=" << gt << endl;
+    double popo = exp( (double)rand() / (double)RAND_MAX );
 }
 
 /*
@@ -97,17 +99,19 @@ protected:
 
 void process_io( int fd )
 {
-    cerr << "cocou" << endl;
     char buf[1024];
     int rr = read( fd, buf, 1024 );
-    cerr << "read " << rr << "bytes " << endl;
+    cerr << "rr=" << rr << " bytes" << endl;
 }
 
 int main( int argc, char** argv )
 {
+
+    srand(time(NULL));
+
     mew::Mew m( 1 );
-    // m.subscribe( "popo", popo1 );
-    m.timer( test_timer, 0.0001 );
+//    m.subscribe( "popo", popo1 );
+    m.timer( test_timer, 1.0 );
     mew::Mew* mm = &m;
 
     // UDP TEST
@@ -128,7 +132,8 @@ int main( int argc, char** argv )
     si_me.sin_addr.s_addr = htonl(INADDR_ANY);
     if (::bind(s, (const sockaddr*)(&si_me), sizeof(si_me))==-1)
         cerr << ":( bind" << endl;
-    m.io( process_io, s );
+
+//    m.io( process_io, s );
     //
 
     thread worker = thread{[mm](){
@@ -136,7 +141,7 @@ int main( int argc, char** argv )
         while(true)
         {
 //            mm->push( "popo", k++ );
-            usleep(150000);
+            usleep(15000);
         }
     }};
 

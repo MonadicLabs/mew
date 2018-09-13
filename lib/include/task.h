@@ -16,7 +16,8 @@ public:
         NONE=0,
         DATA,
         TIMER,
-        IO
+        IO,
+        IO_POLL
     } Type;
 
     Task( Type type = NONE )
@@ -115,6 +116,24 @@ public:
 private:
 
 protected:
+
+};
+
+class IOPollTask : public Task
+{
+public:
+    IOPollTask( double timeout_sec )
+        :Task(IO_POLL), _timeout_sec(timeout_sec)
+    {
+
+    }
+
+    virtual ~IOPollTask()
+    {
+
+    }
+
+    double _timeout_sec;
 
 };
 
