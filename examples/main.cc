@@ -6,7 +6,11 @@ using namespace std;
 
 #include <unistd.h>
 
-#include <mew.h>
+#include <mew2.h>
+
+#include <wsdeque.h>
+#include <jobworker.h>
+
 
 #include <arpa/inet.h>
 #include <netinet/in.h>
@@ -16,135 +20,138 @@ using namespace std;
 #include <unistd.h>
 #include <cstring>
 
-void popo1( int q )
-{
-    cerr << "popo1=" << q << endl;
-}
-
-typedef struct
-{
-    std::string str;
-} test_struct;
-
-void popo2( test_struct str )
-{
-    cerr << "popo2=" << endl;
-    usleep(1000);
-}
-
-void test_timer( double gt )
-{
-    cerr << "***** tick t=" << gt << endl;
-    double popo = exp( (double)rand() / (double)RAND_MAX );
-}
-
 /*
-class MewTest
+void job_func1( mew::Job* j );
+void job_func2( mew::Job* j )
 {
-public:
-    MewTest()
+    for( int k = 0; k < 20; ++k )
     {
-        std::string topicName = "popo";
-        cerr << "mew." << endl;
-        mew::Mew * m = mew::Mew::get_instance();
-
-        std::function<void(int)> binding = std::bind(&MewTest::mt1, this, std::placeholders::_1);
-        std::function<void(test_struct)> binding2 = std::bind(&MewTest::mt2, this, std::placeholders::_1);
-        m->subscribe( topicName, binding );
-        m->subscribe( topicName, binding2 );
-
-        for( int k = 0; k < 100; ++k )
-        {
-            if( k % 2 == 0 )
-            {
-                m->push( topicName, (int)k );
-            }
-            else
-            {
-                test_struct ts;
-                std::stringstream sstr;
-                sstr << "K=" << k;
-                ts.str = sstr.str();
-                m->push( topicName, ts );
-            }
-        }
+        j->pushChild( new mew::Job( job_func1 ) );
     }
-
-    void threadtest()
+    //    cerr << "job_func2" << endl;
+    float f1;
+    float f2 = 2;
+    float f3 = 3;
+    for( int i =0 ; i < 1e5; i++)
     {
-        // std::thread th( &MewTest::mt0, this );
+        f1 = (i * f2 + i / f3) * 0.5; //or divide by 2.0f, respectively
     }
+}
 
-private:
-    void mt0()
+void job_func1( mew::Job* j )
+{
+    //    cerr << "job_func1" << endl;
+    float f1;
+    float f2 = 2;
+    float f3 = 3;
+    for( int i =0 ; i < 1e5; i++)
     {
-
+        f1 = (i * f2 + i / f3) * 0.5; //or divide by 2.0f, respectively
     }
-
-    void mt1( int k )
+    for( int k = 0; k < 10; ++k )
     {
-        cerr << "mt1=" << k << endl;
+        j->pushChild( new mew::Job( job_func2 ) );
     }
-
-    void mt2( test_struct str )
-    {
-        cerr << "mt2=" << str.str << endl;
-    }
-
-
-protected:
-
-};
+}
 */
 
-void process_io( int fd )
+void timer_func1( double dt_usec )
 {
-    char buf[1024];
-    int rr = read( fd, buf, 1024 );
-    cerr << "rr=" << rr << " bytes" << endl;
+    cerr << "timer_func1 dt=" << dt_usec << endl;
 }
 
 int main( int argc, char** argv )
 {
+        mew::Mew m;
+        m.timer( timer_func1, 0.0001 );
 
-    srand(time(NULL));
+        m.run();
 
-    mew::Mew m( 1 );
-//    m.subscribe( "popo", popo1 );
-    m.timer( test_timer, 1.0 );
-    mew::Mew* mm = &m;
+//    srand( time(NULL) );
+//    //    mew::Job j( job_func1 );
+//    std::vector< mew::Job* > jobs;
+//    for( int k= 0; k < 10; ++k )
+//    {
+//        mew::Job * popo = new mew::Job( []( mew::Job* j ){
+//                j->test();
+//        });
+//        jobs.push_back( popo );
+//    }
 
-    // UDP TEST
-#define BUFLEN 512
-#define NPACK 10
-#define PORT 9940
-    struct sockaddr_in si_me, si_other;
-    int s, i, slen=sizeof(si_other);
-    char buf[BUFLEN];
+//    for( mew::Job* j : jobs )
+//    {
+//        j->run();
+//    }
 
-    if ((s=socket(AF_INET, SOCK_DGRAM, IPPROTO_UDP))==-1)
-        //diep("socket");
-        cerr << ":( socket." << endl;
+//    return 0;
 
-    memset((char *) &si_me, 0, sizeof(si_me));
-    si_me.sin_family = AF_INET;
-    si_me.sin_port = htons(PORT);
-    si_me.sin_addr.s_addr = htonl(INADDR_ANY);
-    if (::bind(s, (const sockaddr*)(&si_me), sizeof(si_me))==-1)
-        cerr << ":( bind" << endl;
+//    mew::JobScheduler sched;
+//    sched.push( new mew::Job( job_func1 ) );
+//    sched.run();
 
-//    m.io( process_io, s );
-    //
-
-    thread worker = thread{[mm](){
-        int k = 0;
-        while(true)
-        {
-//            mm->push( "popo", k++ );
-            usleep(15000);
-        }
-    }};
-
-    m.run();
-
+//    return 0;
 }
+
+/*
+#include <functional>
+#include <stdio.h>
+#include <iostream>
+
+template<typename F>
+void AFunctionThatTakesLambdaFunctionAsArgument( F&& lambda )
+{
+    std::string hello("hello world");
+    lambda( hello );
+}
+
+void lambdaExample1()
+{
+    std::string prefix = "Method1 Using std::function ";
+    std::function<void(std::string)>lambda = [prefix] (std::string message) -> int
+    {
+        std::cout << prefix.c_str() << ": " << message.c_str() << "\n";
+        return 0;
+    };
+    AFunctionThatTakesLambdaFunctionAsArgument( lambda );
+}
+
+void lambdaExample2()
+{
+    typedef int (*MyLambda)(std::string );
+    MyLambda lambda  = [] (std::string message) -> int
+    {
+        std::cout << std::string("Method2 Using typedef function ").c_str() <<
+": " << message.c_str() << "\n";
+        return 0;
+    };
+    AFunctionThatTakesLambdaFunctionAsArgument( lambda );
+}
+
+void lambdaExample3()
+{
+    struct MyClosure
+    {
+        std::string m_prefix;
+        int operator() (std::string message)
+        {
+            std::cout << m_prefix.c_str() << ": " << message.c_str() << "\n";
+            return 0;
+        }
+    };
+    MyClosure lambda;
+    lambda.m_prefix = "Method3 Using struct ";//capture data
+    AFunctionThatTakesLambdaFunctionAsArgument( lambda );
+}
+
+void lambdaExamples()
+{
+    lambdaExample1();
+    lambdaExample2();
+    lambdaExample3();
+}
+int main(int , char **)
+{
+    lambdaExamples();
+    return 0;
+}
+*/

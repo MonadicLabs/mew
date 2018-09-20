@@ -1,5 +1,6 @@
 #pragma once
 
+/*
 #include "mewconfig.h"
 
 #include <string>
@@ -13,7 +14,7 @@
 #include <poll.h>
 
 #include "singleton.h"
-#include "any.h"
+#include "cppbackports/any.h"
 #include "runnable.h"
 #include "task.h"
 #include "timer.h"
@@ -24,6 +25,8 @@
 #ifdef MEW_USE_PROFILING
 #include "Remotery.h"
 #endif
+
+#include "job.h"
 
 namespace mew
 {
@@ -405,21 +408,6 @@ void Worker::tick(double timeout_s)
 
     Task * t = nullptr;
 
-    /*
-    if( timeout_s == 0 )
-    {
-        _parent->_taskQueue.try_dequeue( t );
-    }
-    else if( timeout_s < 0 )
-    {
-        _parent->_taskQueue.wait_dequeue( t );
-    }
-    else
-    {
-        _parent->_taskQueue.wait_dequeue_timed(t, timeout_s * 1000000);
-    }
-    */
-
     Timer dt;
     dt.start();
     t = _parent->fetchTask();
@@ -516,3 +504,4 @@ void Worker::tick(double timeout_s)
 #ifdef MEW_USE_PROFILING
 #include "Remotery.c"
 #endif
+*/

@@ -26,91 +26,59 @@
    OR TORT (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE
    OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
  */
-/** @file version.h
- * @brief namespaces for C++11 and C++14
- */
-#ifndef PBL_CPP_VERSION_H
-#define PBL_CPP_VERSION_H
+#ifndef PBL_CPP_CONDITION_VARIABLE_H
+#define PBL_CPP_CONDITION_VARIABLE_H
 
-#include <cstddef>
+#include "version.h"
 
-/// @todo Value may not be correct, because as of writing C++17 isn't official
-#if __cplusplus >= 201703L
-#define CPP17
-#endif
-#if __cplusplus >= 201402L
-#define CPP14
-#endif
-#if __cplusplus >= 201103L
-#define CPP11
-#endif
-
-/* Namespace macros. It's sometimes necessary to put something into the "std"
- * namespace. For example, a specialization of std::hash. These macros can be
- * used to put the code in the correct namespace.
- */
-#ifdef CPP17
-#define CPP17_NAMESPACE std
-#else
-#define CPP17_NAMESPACE cpp17
-#endif
-#ifdef CPP14
-#define CPP14_NAMESPACE std
-#else
-#define CPP14_NAMESPACE cpp14
-#endif
 #ifdef CPP11
-#define CPP11_NAMESPACE std
+#include <condition_variable>
 #else
-#define CPP11_NAMESPACE cpp11
-#endif
+#include "chrono.h"
+#include "config/os.h"
+#include "mutex.h"
 
 namespace cpp11
 {
+namespace cv_status
+{
+enum cv_status {no_timeout, timeout};
 }
 
-#ifndef CPP11
-namespace cpp11
-{
-class nullptr_t
+class condition_variable
 {
 public:
-    template< class T >
-    operator T*() const
-    {
-        return 0;
-    }
+	typedef ::pbl::os::condition_variable_type* native_handle_type;
+	condition_variable();
+	~condition_variable();
+	void notify_one();
+	void notify_all();
+	void wait(unique_lock< mutex >&);
+	native_handle_type native_handle();
 
-    template< class C, class T >
-    operator T C::*( ) const
-    {
-        return 0;
-    }
+	template< class Duration >
+	cv_status::cv_status wait_for(
+		unique_lock< mutex >& l,
+		const Duration&       dt
+	)
+	{
+		chrono::system_clock::time_point t = chrono::system_clock::now();
+
+		t += chrono::duration_cast< chrono::system_clock::duration >(dt);
+
+		return wait_until(l, t);
+	}
+
+	cv_status::cv_status wait_until(unique_lock< mutex >&, const chrono::system_clock::time_point&);
 private:
-    void operator&() const;
+	condition_variable(const condition_variable&);
+	condition_variable& operator=(const condition_variable&);
+
+	::pbl::os::condition_variable_type cond;
 };
 
 }
 
-const cpp11::nullptr_t nullptr = {};
-#endif // ifndef CPP11
+#endif // ifdef CPP11
 
-namespace cpp14
-{
-}
-
-namespace cpp17
-{
-}
-
-/* cpp points to either std or cpp11/14/17 as appropriate
- */
-namespace cpp
-{
-using namespace ::std;
-using namespace ::cpp11;
-using namespace ::cpp14;
-using namespace ::cpp17;
-}
-
-#endif // PBL_CPP_VERSION_H
+#endif // PBL_CPP_CONDITION_VARIABLE_H
