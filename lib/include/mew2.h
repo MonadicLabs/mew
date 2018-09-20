@@ -53,8 +53,9 @@ public:
 
         std::shared_ptr<mew::Job> timerJob = std::make_shared<mew::Job>( []( std::shared_ptr<mew::Job> j ){
                 mew::Mew * m = (mew::Mew*)j->userData();
-                m->processTimers();
-                usleep(10);
+                // m->processTimers();
+                cerr << ".";
+                usleep(1);
                 j->pushChild( j );
     }, this );
 
@@ -67,9 +68,11 @@ private:
     std::shared_ptr< JobScheduler > _scheduler;
 
     // Timers
+    std::mutex _timerMtx;
     std::vector< TimerReference > _timerRefs;
     void processTimers()
     {
+        _timerMtx.lock();
         for( TimerReference& tref : _timerRefs )
         {
 //            cerr << "tref.elapsed=" << tref.t.elapsed() << endl;
@@ -90,7 +93,7 @@ private:
                 tref.t.reset();
             }
         }
-
+        _timerMtx.unlock();
     }
 
 protected:

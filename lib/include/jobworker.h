@@ -90,9 +90,11 @@ class JobWorker
 {
 public:
     JobWorker( JobScheduler* parentScheduler = nullptr )
-        :_parentScheduler(parentScheduler)
+        :_parentScheduler(parentScheduler),
+          _queue(std::make_shared< deque::Deque< std::shared_ptr<Job> > >()),
+          _wep(_queue), _sep(_queue)
     {
-        _queue = std::make_shared< wsdeque::Deque< std::shared_ptr<Job> > >();
+        //        _queue = std::make_shared< wsdeque::Deque< std::shared_ptr<Job> > >();
     }
 
     virtual ~JobWorker()
@@ -104,14 +106,12 @@ public:
 
     void push( std::shared_ptr<Job> j )
     {
-        wsdeque::WorkerEndpoint<std::shared_ptr<Job> > wep(_queue);
-        wep.push( j );
+        _wep.push( j );
     }
 
     bool pop( std::shared_ptr<Job>& j )
     {
-        wsdeque::WorkerEndpoint< std::shared_ptr<Job> > wep(_queue);
-        cpp17::optional< std::shared_ptr<Job> > op = wep.pop();
+        experimental::optional< std::shared_ptr<Job> > op = _wep.pop();
         if( op )
         {
             j = *op;
@@ -126,15 +126,18 @@ public:
 
     bool steal( std::shared_ptr<Job>& j )
     {
-        wsdeque::StealerEndpoint< std::shared_ptr<Job> > sep(_queue);
-        cpp17::optional< std::shared_ptr<Job> > op = sep.steal();
+        //        cerr << "stealing." << endl;
+        auto sep = _sep;
+        experimental::optional< std::shared_ptr<Job> > op = sep.steal();
         if( op )
         {
+//                        cerr << "steal ok" << endl;
             j = *op;
             return true;
         }
         else
         {
+            //            cerr << "steal nok" << endl;
             j = nullptr;
             return false;
         }
@@ -142,7 +145,9 @@ public:
 
 private:
     JobScheduler * _parentScheduler;
-    std::shared_ptr<wsdeque::Deque< std::shared_ptr<Job> > > _queue;
+    std::shared_ptr<deque::Deque< std::shared_ptr<Job> > > _queue;
+    deque::Worker< std::shared_ptr<Job> > _wep;
+    deque::Stealer< std::shared_ptr<Job> > _sep;
 
 protected:
 
@@ -174,17 +179,32 @@ public:
         spawnAdditionalWorkers();
     }
 
-    bool trySteal( std::shared_ptr<Job>& j )
+    bool trySteal( std::shared_ptr<Job>& j, JobWorker* caller )
     {
+//        cerr << "trySteal... ";
+        bool ret = false;
         // select a worker randomly
         size_t k = rand() % _workers.size();
-        return _workers[k]->steal( j );
+        if( _workers[k] != caller )
+        {
+            ret = _workers[k]->steal( j );
+        }
+        else
+        {
+            j = nullptr;
+            ret = false;
+        }
+//        if( ret )
+//            cerr << "OK" << endl;
+//        else
+//            cerr << "NOK" << endl;
+        return ret;
     }
 
 private:
     void spawnAdditionalWorkers()
     {
-        unsigned concurentThreadsSupported = 2; // std::thread::hardware_concurrency();
+        unsigned concurentThreadsSupported = 8; //std::thread::hardware_concurrency();
         for( unsigned int k = 0; k < concurentThreadsSupported - 1; ++k )
         {
             cerr << "SPAWN." << endl;
@@ -224,11 +244,11 @@ void JobWorker::run()
         std::shared_ptr<Job> j = nullptr;
         if( pop(j) )
         {
-//            cerr << "pop ok j = " << j << endl;
+            //            cerr << "pop ok j = " << j << endl;
             j->_assignedWorker = this;
-//            cerr << "will run" << endl;
+            //            cerr << "will run" << endl;
             j->run();
-//            cerr << "has run" << endl;
+            //            cerr << "has run" << endl;
             j->_assignedWorker = nullptr;
             //            delete j;
             continue;
@@ -239,22 +259,23 @@ void JobWorker::run()
             if( _parentScheduler )
             {
                 //                cerr << "parent=" << _parentScheduler << endl;
-                if( _parentScheduler->trySteal( j ) )
+                if( _parentScheduler->trySteal( j, this ) )
                 {
-                    cerr << "stole a job !" << endl;
+                    //                    cerr << "stole a job !" << endl;
                     j->_assignedWorker = this;
                     j->run();
                     j->_assignedWorker = nullptr;
-                    //                    delete j;
+                    std::this_thread::sleep_for( std::chrono::microseconds(10) );
                 }
                 else
                 {
                     // could not steal
                     //                  cerr << "could not steal !" << endl;
+                    std::this_thread::sleep_for( std::chrono::microseconds(10) );
                 }
             }
-            std::this_thread::sleep_for( std::chrono::microseconds(1) );
         }
+        std::this_thread::sleep_for( std::chrono::microseconds(10) );
     }
 }
 

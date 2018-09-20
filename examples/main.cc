@@ -60,36 +60,41 @@ void timer_func1( double dt_usec )
     cerr << "timer_func1 dt=" << dt_usec << endl;
 }
 
+struct A { int a[100]; };
+struct B { int x, y; };
 int main( int argc, char** argv )
 {
-        mew::Mew m;
-        m.timer( timer_func1, 0.0001 );
 
-        m.run();
+    mew::Mew m;
 
-//    srand( time(NULL) );
-//    //    mew::Job j( job_func1 );
-//    std::vector< mew::Job* > jobs;
-//    for( int k= 0; k < 10; ++k )
-//    {
-//        mew::Job * popo = new mew::Job( []( mew::Job* j ){
-//                j->test();
-//        });
-//        jobs.push_back( popo );
-//    }
+    m.timer( timer_func1, 0.01 );
+    //        m.timer( timer_func1, 0.05 );
 
-//    for( mew::Job* j : jobs )
-//    {
-//        j->run();
-//    }
+    m.run();
 
-//    return 0;
+    //    srand( time(NULL) );
+    //    //    mew::Job j( job_func1 );
+    //    std::vector< mew::Job* > jobs;
+    //    for( int k= 0; k < 10; ++k )
+    //    {
+    //        mew::Job * popo = new mew::Job( []( mew::Job* j ){
+    //                j->test();
+    //        });
+    //        jobs.push_back( popo );
+    //    }
 
-//    mew::JobScheduler sched;
-//    sched.push( new mew::Job( job_func1 ) );
-//    sched.run();
+    //    for( mew::Job* j : jobs )
+    //    {
+    //        j->run();
+    //    }
 
-//    return 0;
+    //    return 0;
+
+    //    mew::JobScheduler sched;
+    //    sched.push( new mew::Job( job_func1 ) );
+    //    sched.run();
+
+    //    return 0;
 }
 
 /*
