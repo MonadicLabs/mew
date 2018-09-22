@@ -18,14 +18,11 @@ public:
         stopped = 0;
         startTimeInMicroSec = 0;
         endTimeInMicroSec = 0;
-
-        _mutex = new std::recursive_mutex();
-
     }
 
     virtual ~Timer()
     {
-        delete _mutex;
+
     }
 
     void    reset()
@@ -98,8 +95,5 @@ private:
     struct timespec startCount;                         //
     struct timespec endCount;                           //
 #endif
-
-    // Thread safety
-    std::recursive_mutex * _mutex;
 
 };

@@ -29,6 +29,9 @@ public:
 
     void run()
     {
+        //
+        Job * timerJob = createTimerCheckJob();
+        _scheduler->push( timerJob );
         return _scheduler->run();
     }
 
@@ -50,16 +53,11 @@ public:
         tref.f = f;
         tref.t.reset();
         _timerRefs.push_back( tref );
+    }
 
-        std::shared_ptr<mew::Job> timerJob = std::make_shared<mew::Job>( []( std::shared_ptr<mew::Job> j ){
-                mew::Mew * m = (mew::Mew*)j->userData();
-                m->processTimers();
-                usleep(10);
-                j->pushChild( j );
-    }, this );
-
-        _scheduler->push( timerJob );
-
+    void print()
+    {
+        _scheduler->print();
     }
 
 private:
@@ -67,30 +65,64 @@ private:
     std::shared_ptr< JobScheduler > _scheduler;
 
     // Timers
-    std::vector< TimerReference > _timerRefs;
-    void processTimers()
+    typedef struct
     {
-        for( TimerReference& tref : _timerRefs )
+        Mew * mew;
+        TimerReference ref;
+    } TimerTrigger;
+    std::mutex _timerLock;
+    std::vector< TimerReference > _timerRefs;
+    std::vector< TimerReference > processTimers()
+    {
+        std::vector< TimerReference > ret;
+        _timerLock.lock();
+        for( int i = 0; i < _timerRefs.size(); ++i )
         {
-//            cerr << "tref.elapsed=" << tref.t.elapsed() << endl;
+            TimerReference& tref = _timerRefs[i];
             if( tref.t.elapsed() > tref.dt_sec )
             {
-                tref.f( tref.t.elapsed() );
-                /*
-                auto cbf = tref.f;
-                cerr << "cbf=" << &tref << endl;
-                std::shared_ptr< mew::Job > jexec = std::make_shared< mew::Job >( []( std::shared_ptr<mew::Job> j ){
-                    TimerReference * tr = (TimerReference*)(j->userData() );
-                    cerr << "f=" << tr << endl;
-                    tr->f( 55.0 );
-                    cerr << "executing Timer callback somehow !" << endl;
-                }, &tref );
-                _scheduler->push( jexec );
-                */
+                // cerr << "trigger_add " << i << endl;
+                ret.push_back(tref);
                 tref.t.reset();
             }
         }
-
+        _timerLock.unlock();
+        return ret;
+    }
+    Job * createTimerCheckJob()
+    {
+        Job * timerJob = new Job( []( Job* j ){
+                mew::Mew * m = (mew::Mew*)j->userData();
+                j->pushChild( m->createTimerCheckJob() );
+                std::vector< TimerReference > trigList = m->processTimers();
+                for( TimerReference tref : trigList )
+                {
+                    /*
+                    // IT LEAKS...
+                    TimerTrigger * trig = new TimerTrigger();
+                    trig->mew = m;
+                    trig->ref = tref;
+                    mew::Job * trigJob = new Job( []( mew::Job* j ) {
+                        TimerTrigger * t = (TimerTrigger*)j->userData();
+                        t->ref.f( 777.0 );
+                        delete t;
+                    }, trig );
+                    trigJob->label() = "TIMER_CALLBACK";
+                    j->pushChild( trigJob );
+                    */
+        #ifdef MEW_USE_PROFILING
+                rmt_BeginCPUSample( TIMER_CALLBACK, 0);
+        #endif
+                    tref.f(555.0);
+        #ifdef MEW_USE_PROFILING
+                rmt_EndCPUSample();
+        #endif
+                    tref.t.reset();
+                }
+                usleep(10);
+        }, this );
+        timerJob->label() = "TIMER_CHECK";
+        return timerJob;
     }
 
 protected:

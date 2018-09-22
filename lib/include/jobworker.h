@@ -5,9 +5,10 @@
 #include <functional>
 #include <iostream>
 #include <vector>
+#include <mutex>
 
 #include "mewconfig.h"
-#include "wsdeque.h"
+#include "workstealingqueue.h"
 #include "job.h"
 
 #ifdef MEW_USE_PROFILING
@@ -25,23 +26,30 @@ class Job : public std::enable_shared_from_this<Job>
 public:
 
     Job()
-        :_assignedWorker(nullptr), _f(nullptr)
+        :_assignedWorker(nullptr), _scheduleCounter(0), _f(nullptr), _label("JOB")
     {
-
+//        cerr << "job_ctor()" << endl;
     }
 
     template<typename F>
     Job( F&& f = nullptr, void * userData = nullptr )
-        :_assignedWorker(nullptr), _userData(userData)
+        :_assignedWorker(nullptr), _scheduleCounter(0), _userData(userData), _label("JOB")
     {
+//        cerr << "job_ctor_func()" << endl;
         _f = [&f, this]{
-            f( shared_from_this() );
+            f( this );
         };
     }
 
     virtual ~Job()
     {
+        if( _joblock.try_lock() )
+            _joblock.unlock();
+    }
 
+    Job& operator =( const Job& other )
+    {
+        cerr << "operator =" << endl;
     }
 
     template<typename F>
@@ -52,12 +60,22 @@ public:
         };
     }
 
-    void pushChild(std::shared_ptr<Job> j );
+    void lock()
+    {
+        _joblock.lock();
+    }
+
+    void unlock()
+    {
+        _joblock.unlock();
+    }
+
+    void pushChild(Job* j );
 
     void run()
     {
 #ifdef MEW_USE_PROFILING
-        rmt_BeginCPUSample(JOB_RUN, 0);
+        rmt_BeginCPUSampleDynamic( _label.c_str(), 0);
 #endif
         // test();
         _f();
@@ -71,15 +89,33 @@ public:
         std::cerr << "job_test." << std::endl;
     }
 
+    int counter()
+    {
+        return _scheduleCounter.load();
+    }
+
     void * userData()
     {
         return _userData;
     }
 
+    std::string& label()
+    {
+        return _label;
+    }
+
+    void setWorker( JobWorker* w )
+    {
+        _assignedWorker.store( w );
+    }
+
 private:
     std::function<void(void)> _f;
-    JobWorker* _assignedWorker;
+    std::atomic<JobWorker*> _assignedWorker;
     void * _userData;
+    std::mutex _joblock;
+    std::atomic<int> _scheduleCounter;
+    std::string _label;
 
 protected:
 
@@ -92,7 +128,7 @@ public:
     JobWorker( JobScheduler* parentScheduler = nullptr )
         :_parentScheduler(parentScheduler)
     {
-        _queue = std::make_shared< wsdeque::Deque< std::shared_ptr<Job> > >();
+        _jobCounter.store( 0 );
     }
 
     virtual ~JobWorker()
@@ -102,47 +138,47 @@ public:
 
     void run();
 
-    void push( std::shared_ptr<Job> j )
+    bool push( Job* j )
     {
-        wsdeque::WorkerEndpoint<std::shared_ptr<Job> > wep(_queue);
-        wep.push( j );
+//        cerr << "will push " << j->label() << "... ";
+        bool ret = _queue.push( j );
+        if( ret )
+        {
+//            cerr << "success.";
+        }
+//        cerr << endl;
+        return ret;
     }
 
-    bool pop( std::shared_ptr<Job>& j )
+    bool pop( Job*& j )
     {
-        wsdeque::WorkerEndpoint< std::shared_ptr<Job> > wep(_queue);
-        cpp17::optional< std::shared_ptr<Job> > op = wep.pop();
-        if( op )
+        bool ret = _queue.pop( j );
+        if( ret )
         {
-            j = *op;
-            return true;
+//            cerr << "poped type " << j->label() << endl;
         }
-        else
-        {
-            j = nullptr;
-            return false;
-        }
+        return ret;
     }
 
-    bool steal( std::shared_ptr<Job>& j )
+    bool steal( Job*& j )
     {
-        wsdeque::StealerEndpoint< std::shared_ptr<Job> > sep(_queue);
-        cpp17::optional< std::shared_ptr<Job> > op = sep.steal();
-        if( op )
-        {
-            j = *op;
-            return true;
-        }
-        else
-        {
-            j = nullptr;
-            return false;
-        }
+        return _queue.steal(j);
+    }
+
+    void print_counter()
+    {
+        cerr << "worker " << this << " jobs=" << _jobCounter.load() << endl;
+    }
+
+    void print()
+    {
+        cerr << "Worker_Queue_Size: " << _queue.size() << endl;
     }
 
 private:
     JobScheduler * _parentScheduler;
-    std::shared_ptr<wsdeque::Deque< std::shared_ptr<Job> > > _queue;
+    WorkStealingQueue< Job* > _queue;
+    std::atomic<int> _jobCounter;
 
 protected:
 
@@ -174,17 +210,25 @@ public:
         spawnAdditionalWorkers();
     }
 
-    bool trySteal( std::shared_ptr<Job>& j )
+    bool trySteal( Job*& j )
     {
         // select a worker randomly
         size_t k = rand() % _workers.size();
         return _workers[k]->steal( j );
     }
 
+    void print()
+    {
+        for( int k = 0; k < _workers.size(); ++k )
+        {
+            _workers[k]->print();
+        }
+    }
+
 private:
     void spawnAdditionalWorkers()
     {
-        unsigned concurentThreadsSupported = 2; // std::thread::hardware_concurrency();
+        unsigned concurentThreadsSupported = 1; // std::thread::hardware_concurrency();
         for( unsigned int k = 0; k < concurentThreadsSupported - 1; ++k )
         {
             cerr << "SPAWN." << endl;
@@ -204,11 +248,25 @@ protected:
 
 };
 
-void Job::pushChild(std::shared_ptr<Job> j)
+void Job::pushChild(Job* j)
 {
-    if( _assignedWorker )
+    JobWorker * w = _assignedWorker.load();
+    if( w )
     {
-        _assignedWorker->push( j );
+        if( w->push( j ) )
+        {
+
+        }
+        else
+        {
+            cerr << "nope." << endl;
+            delete j;
+        }
+    }
+    else
+    {
+        cerr << "w=" << w << endl;
+        delete j;
     }
 }
 
@@ -221,16 +279,19 @@ void JobWorker::run()
 #endif
     while(true)
     {
-        std::shared_ptr<Job> j = nullptr;
+        Job* j = nullptr;
         if( pop(j) )
         {
-//            cerr << "pop ok j = " << j << endl;
-            j->_assignedWorker = this;
-//            cerr << "will run" << endl;
+            j->lock();
+            //            cerr << "pop ok j = " << j << endl;
+            j->setWorker( this );
+            //            cerr << "will run" << endl;
             j->run();
-//            cerr << "has run" << endl;
-            j->_assignedWorker = nullptr;
+            //            cerr << "has run" << endl;
+            j->setWorker( nullptr );
             //            delete j;
+            j->unlock();
+            delete j;
             continue;
         }
         else
@@ -241,19 +302,23 @@ void JobWorker::run()
                 //                cerr << "parent=" << _parentScheduler << endl;
                 if( _parentScheduler->trySteal( j ) )
                 {
-                    cerr << "stole a job !" << endl;
-                    j->_assignedWorker = this;
+                    j->lock();
+                    //            cerr << "pop ok j = " << j << endl;
+                    j->setWorker( this );
+                    //            cerr << "will run" << endl;
                     j->run();
-                    j->_assignedWorker = nullptr;
-                    //                    delete j;
+                    //            cerr << "has run" << endl;
+                    j->setWorker( nullptr );
+                    //            delete j;
+                    j->unlock();
+                    delete j;
                 }
                 else
                 {
-                    // could not steal
-                    //                  cerr << "could not steal !" << endl;
+                    std::this_thread::sleep_for( std::chrono::microseconds(100) );
                 }
             }
-            std::this_thread::sleep_for( std::chrono::microseconds(1) );
+            std::this_thread::sleep_for( std::chrono::microseconds(100) );
         }
     }
 }

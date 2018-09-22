@@ -7,10 +7,8 @@ using namespace std;
 #include <unistd.h>
 
 #include <mew2.h>
-
-#include <wsdeque.h>
+#include <workstealingqueue_impl2.h>
 #include <jobworker.h>
-
 
 #include <arpa/inet.h>
 #include <netinet/in.h>
@@ -19,6 +17,17 @@ using namespace std;
 #include <sys/socket.h>
 #include <unistd.h>
 #include <cstring>
+
+void burn_cpu()
+{
+    float f1;
+    float f2 = 2;
+    float f3 = 3;
+    for( int i =0 ; i < 1e7; i++)
+    {
+        f1 = (i * f2 + i / f3) * 0.5; //or divide by 2.0f, respectively
+    }
+}
 
 /*
 void job_func1( mew::Job* j );
@@ -58,38 +67,62 @@ void job_func1( mew::Job* j )
 void timer_func1( double dt_usec )
 {
     cerr << "timer_func1 dt=" << dt_usec << endl;
+    //    usleep(100000);
+    burn_cpu();
+}
+
+void timer_func2( double dt_usec )
+{
+    cerr << "timer_func2 dt=" << dt_usec << endl;
+    // burn_cpu();
+    //    usleep(100000);
 }
 
 int main( int argc, char** argv )
 {
-        mew::Mew m;
-        m.timer( timer_func1, 0.0001 );
 
-        m.run();
+    //    WorkStealingStack< std::shared_ptr< int > > test;
+    //    test.Push( std::make_shared<int>() );
 
-//    srand( time(NULL) );
-//    //    mew::Job j( job_func1 );
-//    std::vector< mew::Job* > jobs;
-//    for( int k= 0; k < 10; ++k )
-//    {
-//        mew::Job * popo = new mew::Job( []( mew::Job* j ){
-//                j->test();
-//        });
-//        jobs.push_back( popo );
-//    }
+    //    std::atomic< std::shared_ptr< int > > testa;
+    //    testa.store( std::make_shared<int>() );
+    //        mew::Job j;
 
-//    for( mew::Job* j : jobs )
-//    {
-//        j->run();
-//    }
+    //        sleep(5);
 
-//    return 0;
+    mew::Mew m;
+    double dt = 0.01;
+    for( int k = 0; k < 1; ++k )
+    {
+        m.timer( timer_func2, dt );
+    }
+    m.timer( timer_func1, 0.01 );
 
-//    mew::JobScheduler sched;
-//    sched.push( new mew::Job( job_func1 ) );
-//    sched.run();
+    m.run();
 
-//    return 0;
+    //    srand( time(NULL) );
+    //    //    mew::Job j( job_func1 );
+    //    std::vector< mew::Job* > jobs;
+    //    for( int k= 0; k < 10; ++k )
+    //    {
+    //        mew::Job * popo = new mew::Job( []( mew::Job* j ){
+    //                j->test();
+    //        });
+    //        jobs.push_back( popo );
+    //    }
+
+    //    for( mew::Job* j : jobs )
+    //    {
+    //        j->run();
+    //    }
+
+    //    return 0;
+
+    //    mew::JobScheduler sched;
+    //    sched.push( new mew::Job( job_func1 ) );
+    //    sched.run();
+
+    //    return 0;
 }
 
 /*
