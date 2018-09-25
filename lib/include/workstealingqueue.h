@@ -1,11 +1,12 @@
 #pragma once
 
+#include <abstractqueue.h>
 #include <workstealingqueue_impl2.h>
 
 namespace mew
 {
     template< class T >
-    class WorkStealingQueue
+    class WorkStealingQueue : public AbstractQueue<T>
     {
     public:
         WorkStealingQueue()

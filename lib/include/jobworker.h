@@ -9,6 +9,7 @@
 
 #include "mewconfig.h"
 #include "workstealingqueue.h"
+#include "fifoqueue.h"
 #include "job.h"
 
 #ifdef MEW_USE_PROFILING
@@ -17,8 +18,9 @@
 
 namespace mew
 {
+
 class JobWorker;
-class Job : public std::enable_shared_from_this<Job>
+class Job
 {
 
     friend class JobWorker;
@@ -28,14 +30,14 @@ public:
     Job()
         :_assignedWorker(nullptr), _scheduleCounter(0), _f(nullptr), _label("JOB")
     {
-//        cerr << "job_ctor()" << endl;
+        //        cerr << "job_ctor()" << endl;
     }
 
     template<typename F>
     Job( F&& f = nullptr, void * userData = nullptr )
         :_assignedWorker(nullptr), _scheduleCounter(0), _userData(userData), _label("JOB")
     {
-//        cerr << "job_ctor_func()" << endl;
+        //        cerr << "job_ctor_func()" << endl;
         _f = [&f, this]{
             f( this );
         };
@@ -74,10 +76,10 @@ public:
 
     void run()
     {
+//        cerr << "JOB:" << _label << endl;
 #ifdef MEW_USE_PROFILING
         rmt_BeginCPUSampleDynamic( _label.c_str(), 0);
 #endif
-        // test();
         _f();
 #ifdef MEW_USE_PROFILING
         rmt_EndCPUSample();
@@ -136,43 +138,31 @@ public:
 
     }
 
-    void run();
+    virtual void run();
 
-    bool push( Job* j )
+    virtual bool push( Job* j )
     {
-//        cerr << "will push " << j->label() << "... ";
         bool ret = _queue.push( j );
         if( ret )
         {
-//            cerr << "success.";
+
         }
-//        cerr << endl;
         return ret;
     }
 
-    bool pop( Job*& j )
+    virtual bool pop( Job*& j )
     {
         bool ret = _queue.pop( j );
         if( ret )
         {
-//            cerr << "poped type " << j->label() << endl;
+
         }
-        return ret;
+        return ret & (j != nullptr);
     }
 
-    bool steal( Job*& j )
+    virtual bool steal( Job*& j )
     {
         return _queue.steal(j);
-    }
-
-    void print_counter()
-    {
-        cerr << "worker " << this << " jobs=" << _jobCounter.load() << endl;
-    }
-
-    void print()
-    {
-        cerr << "Worker_Queue_Size: " << _queue.size() << endl;
     }
 
 private:
@@ -184,11 +174,66 @@ protected:
 
 };
 
-class JobScheduler : public JobWorker
+class MainThreadJobWorker : public JobWorker
 {
 public:
-    JobScheduler()
-        :JobWorker(this)
+    MainThreadJobWorker( JobScheduler* parentScheduler = nullptr, int requiredAdditionnalThreads = 0 )
+        :JobWorker(parentScheduler), _singleThreadQueue(nullptr)
+    {
+        if( requiredAdditionnalThreads == 0 )
+        {
+            _singleThreadQueue = new FIFOQueue< Job* >();
+            cerr << "Using single thread mode !" << endl;
+        }
+        else
+        {
+            cerr << "Using multi thread mode" << endl;
+        }
+    }
+
+    virtual ~MainThreadJobWorker()
+    {
+
+    }
+
+    virtual bool push( Job* j )
+    {
+        if( _singleThreadQueue )
+            return _singleThreadQueue->push(j);
+        return JobWorker::push( j );
+    }
+
+    virtual bool pop( Job*& j )
+    {
+        if( _singleThreadQueue )
+            return _singleThreadQueue->pop(j);
+        return JobWorker::pop( j );
+    }
+
+    virtual bool steal( Job*& j )
+    {
+        if( _singleThreadQueue )
+            return false;
+        return JobWorker::steal( j );
+    }
+
+    virtual void run()
+    {
+        return JobWorker::run();
+    }
+
+private:
+    AbstractQueue< Job* > * _singleThreadQueue;
+
+protected:
+
+};
+
+class JobScheduler : public MainThreadJobWorker
+{
+public:
+    JobScheduler( int requiredAdditionnalThreads = 0 )
+        :_requiredAdditionnalThreads( requiredAdditionnalThreads ), MainThreadJobWorker(this, requiredAdditionnalThreads)
     {
 
 #ifdef MEW_USE_PROFILING
@@ -203,33 +248,32 @@ public:
         rmtSettings* settings = rmt_Settings();
         remoteryPort = settings->port;
         cerr << "Remotery PORT=" << remoteryPort << endl;
-        sleep(3);
+        sleep(2);
 #endif
 
         _workers.push_back( this );
-        spawnAdditionalWorkers();
+        spawnAdditionalWorkers( _requiredAdditionnalThreads );
+
     }
 
     bool trySteal( Job*& j )
     {
         // select a worker randomly
         size_t k = rand() % _workers.size();
-        return _workers[k]->steal( j );
-    }
-
-    void print()
-    {
-        for( int k = 0; k < _workers.size(); ++k )
+        bool ret = _workers[k]->steal( j );
+        if( ret && j == 0 )
         {
-            _workers[k]->print();
+//            cerr << "trySteal grabbed nullptr..." << endl;
+//            cerr << "k=" << k << endl;
+//            sleep(5);
         }
+        return ret & (j != nullptr);
     }
 
 private:
-    void spawnAdditionalWorkers()
+    void spawnAdditionalWorkers( int n )
     {
-        unsigned concurentThreadsSupported = 1; // std::thread::hardware_concurrency();
-        for( unsigned int k = 0; k < concurentThreadsSupported - 1; ++k )
+        for( unsigned int k = 0; k < n; ++k )
         {
             cerr << "SPAWN." << endl;
             JobWorker * worker = new JobWorker( this );
@@ -243,6 +287,7 @@ private:
 
     std::vector< JobWorker* > _workers;
     std::vector< std::thread > _workerThreads;
+    int _requiredAdditionnalThreads;
 
 protected:
 

@@ -1,10 +1,15 @@
 #pragma once
 
+#include <map>
+
+#include <poll.h>
+
 #include "jobworker.h"
 #include "timer.h"
 
 namespace mew
 {
+
 class Mew
 {
 
@@ -14,12 +19,23 @@ class Mew
         double dt_sec;
         double approach;
         std::function<void(double)> f;
+        std::atomic< int > processed;
     } TimerReference;
+
+    typedef struct
+    {
+        std::function<void(int)> f;
+        int fd;
+        std::atomic<int> processed;
+    } IOReference;
 
 public:
     Mew()
     {
-        _scheduler = std::make_shared<mew::JobScheduler>();
+        int numAdditionnalThreads = std::thread::hardware_concurrency() - 1;
+//                int numAdditionnalThreads = 0;
+        cerr << "Number of additionnal threads = " << numAdditionnalThreads << endl;
+        _scheduler = std::make_shared<mew::JobScheduler>( numAdditionnalThreads );
     }
 
     virtual ~Mew()
@@ -31,6 +47,8 @@ public:
     {
         //
         Job * timerJob = createTimerCheckJob();
+        Job * ioJob = createIOCheckJob();
+        _scheduler->push( ioJob );
         _scheduler->push( timerJob );
         return _scheduler->run();
     }
@@ -47,43 +65,49 @@ public:
     void timer( std::function<R(Arg)> f, double dt_sec )
     {
         cerr << "timer std::function" << endl;
-        TimerReference tref;
-        tref.dt_sec = dt_sec;
-        tref.approach = std::numeric_limits<double>::max();
-        tref.f = f;
-        tref.t.reset();
+        TimerReference* tref = new TimerReference();
+        tref->dt_sec = dt_sec;
+        tref->approach = std::numeric_limits<double>::max();
+        tref->f = f;
+        tref->t.reset();
+        tref->processed = 0;
         _timerRefs.push_back( tref );
     }
 
-    void print()
+    template<typename R, typename Arg>
+    void io( R (*fptr)(Arg), int filedescriptor )
     {
-        _scheduler->print();
+        cerr << "io fptr" << endl;
+        std::function<R(Arg)> f = static_cast<std::function<R(Arg)> >(fptr);
+        this->io( f, filedescriptor );
+    }
+
+    template<typename R, typename Arg>
+    void io( std::function<R(Arg)> f, int filedescriptor )
+    {
+        cerr << "io std::function" << endl;
+        IOReference * ioref = new IOReference();
+        ioref->fd = filedescriptor;
+        ioref->f = f;
+        ioref->processed = 0;
+        _ioRefs.push_back( ioref );
     }
 
 private:
     // Job Scheduler
     std::shared_ptr< JobScheduler > _scheduler;
-
-    // Timers
-    typedef struct
-    {
-        Mew * mew;
-        TimerReference ref;
-    } TimerTrigger;
     std::mutex _timerLock;
-    std::vector< TimerReference > _timerRefs;
-    std::vector< TimerReference > processTimers()
+    std::vector< TimerReference* > _timerRefs;
+    std::vector< TimerReference* > processTimers()
     {
-        std::vector< TimerReference > ret;
+        std::vector< TimerReference* > ret;
         _timerLock.lock();
         for( int i = 0; i < _timerRefs.size(); ++i )
         {
-            TimerReference& tref = _timerRefs[i];
-            if( tref.t.elapsed() > tref.dt_sec )
+            TimerReference* tref = _timerRefs[i];
+            if( tref->t.elapsed() > tref->dt_sec && tref->processed == 0 )
             {
-                // cerr << "trigger_add " << i << endl;
                 ret.push_back(tref);
-                tref.t.reset();
             }
         }
         _timerLock.unlock();
@@ -94,36 +118,88 @@ private:
         Job * timerJob = new Job( []( Job* j ){
                 mew::Mew * m = (mew::Mew*)j->userData();
                 j->pushChild( m->createTimerCheckJob() );
-                std::vector< TimerReference > trigList = m->processTimers();
-                for( TimerReference tref : trigList )
+                std::vector< TimerReference* > trigList = m->processTimers();
+                for( TimerReference* tref : trigList )
                 {
-                    /*
-                    // IT LEAKS...
-                    TimerTrigger * trig = new TimerTrigger();
-                    trig->mew = m;
-                    trig->ref = tref;
+                    tref->processed = 1;
                     mew::Job * trigJob = new Job( []( mew::Job* j ) {
-                        TimerTrigger * t = (TimerTrigger*)j->userData();
-                        t->ref.f( 777.0 );
-                        delete t;
-                    }, trig );
+                        TimerReference * tr = (TimerReference*)j->userData();
+                        tr->f( tr->t.elapsed() );
+                        tr->processed = 0;
+                        tr->t.reset();
+                    }, tref );
                     trigJob->label() = "TIMER_CALLBACK";
                     j->pushChild( trigJob );
-                    */
-        #ifdef MEW_USE_PROFILING
-                rmt_BeginCPUSample( TIMER_CALLBACK, 0);
-        #endif
-                    tref.f(555.0);
-        #ifdef MEW_USE_PROFILING
-                rmt_EndCPUSample();
-        #endif
-                    tref.t.reset();
                 }
-                usleep(10);
+                // Should be half the smallest timer tick value
+                usleep(100);
         }, this );
         timerJob->label() = "TIMER_CHECK";
         return timerJob;
     }
+
+// IO
+std::mutex _ioLock;
+std::vector< IOReference* > _ioRefs;
+double _ioTimeoutSecs;
+void processIO()
+{
+    _ioLock.lock();
+    // cerr << "processIO" << endl;
+    std::vector<struct pollfd> pfds;
+    std::map< int, IOReference* > _callbacks;
+    for( IOReference* ioref : _ioRefs )
+    {
+        if( ioref->processed == 0 )
+        {
+            pfds.push_back({ ioref->fd, POLLIN, 0} );
+            _callbacks.insert( make_pair( ioref->fd, ioref ) );
+        }
+    }
+    int ret = ::poll(&pfds[0], pfds.size(), 10.0 );
+    if(ret < 0){
+        // TODO
+        // throw std::runtime_error(std::string("poll: ") + std::strerror(errno));
+        cerr << "poll ERRROR!" << endl;
+    }
+    else if( ret == 0 )
+    {
+        //            cerr << "timeout !" << endl;
+    }
+    else
+    {
+        for( struct pollfd &p : pfds)
+        {
+            if(p.revents == POLLIN)
+            {
+//                cerr << "data ready ?" << endl;
+                p.revents = 0;
+                _callbacks[ p.fd ]->processed = 1;
+                Job * ioJob = new Job( []( Job* j ){
+                    IOReference * ior = (IOReference*)(j->userData());
+                    ior->f( ior->fd );
+                    ior->processed = 0;
+                }, _callbacks[ p.fd ] );
+                ioJob->label() = "IO_CALLBACK";
+                _scheduler->push( ioJob );
+            }
+
+        }
+    }
+    _ioLock.unlock();
+}
+Job * createIOCheckJob()
+{
+    Job * ioJob = new Job( []( Job* j ){
+            mew::Mew * m = (mew::Mew*)j->userData();
+            // cerr << "dlkfjdlkfjdfklj" << endl;
+            m->processIO();
+            // usleep(100);
+            j->pushChild( m->createIOCheckJob() );
+    }, this );
+    ioJob->label() = "IO_CHECK";
+    return ioJob;
+}
 
 protected:
 

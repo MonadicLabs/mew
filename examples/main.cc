@@ -18,12 +18,24 @@ using namespace std;
 #include <unistd.h>
 #include <cstring>
 
-void burn_cpu()
+
+// IO
+#include <arpa/inet.h>
+#include <netinet/in.h>
+#include <stdio.h>
+#include <sys/types.h>
+#include <sys/socket.h>
+#include <unistd.h>
+#include <cstring>
+
+//
+
+void burn_cpu( int iter = 1e7 )
 {
     float f1;
     float f2 = 2;
     float f3 = 3;
-    for( int i =0 ; i < 1e7; i++)
+    for( int i =0 ; i < iter; i++)
     {
         f1 = (i * f2 + i / f3) * 0.5; //or divide by 2.0f, respectively
     }
@@ -68,14 +80,22 @@ void timer_func1( double dt_usec )
 {
     cerr << "timer_func1 dt=" << dt_usec << endl;
     //    usleep(100000);
-    burn_cpu();
+    // burn_cpu(1e3);
 }
 
 void timer_func2( double dt_usec )
 {
     cerr << "timer_func2 dt=" << dt_usec << endl;
-    // burn_cpu();
-    //    usleep(100000);
+    // burn_cpu(1e6);
+}
+
+void io_test1( int fd )
+{
+//    cerr << "cocou" << endl;
+    char buf[1024];
+    int rr = read( fd, buf, 1024 );
+    cerr << "read " << rr << "bytes " << endl;
+    // burn_cpu(1e6);
 }
 
 int main( int argc, char** argv )
@@ -91,12 +111,33 @@ int main( int argc, char** argv )
     //        sleep(5);
 
     mew::Mew m;
-    double dt = 0.01;
+    double dt = 0.1;
     for( int k = 0; k < 1; ++k )
     {
         m.timer( timer_func2, dt );
     }
-    m.timer( timer_func1, 0.01 );
+    m.timer( timer_func1, 0.1 );
+
+    // UDP TEST
+    #define BUFLEN 512
+    #define NPACK 10
+    #define PORT 9940
+    struct sockaddr_in si_me, si_other;
+    int s, i, slen=sizeof(si_other);
+    char buf[BUFLEN];
+
+    if ((s=socket(AF_INET, SOCK_DGRAM, IPPROTO_UDP))==-1)
+        //diep("socket");
+        cerr << ":( socket." << endl;
+
+    memset((char *) &si_me, 0, sizeof(si_me));
+    si_me.sin_family = AF_INET;
+    si_me.sin_port = htons(PORT);
+    si_me.sin_addr.s_addr = htonl(INADDR_ANY);
+    if (::bind(s, (const sockaddr*)(&si_me), sizeof(si_me))==-1)
+        cerr << ":( bind" << endl;
+    m.io( io_test1, s );
+    //
 
     m.run();
 
