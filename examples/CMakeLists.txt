@@ -1,6 +1,7 @@
 cmake_minimum_required(VERSION 2.8)
 project(LIBMEW_EXAMPLE)
 
+
 #
 #
 ## CHECK FOR COMPILER CAPABILITIES
@@ -18,7 +19,7 @@ else()
 endif()
 ##
 
-SET( CMAKE_CXX_FLAGS  "${CMAKE_CXX_FLAGS} -fpermissive " )
+SET( CMAKE_CXX_FLAGS  "${CMAKE_CXX_FLAGS} -fpermissive -march=native" )
 
 include_directories(${LIBMEW_SOURCE_DIR}/include)
 include_directories(${PROJECT_SOURCE_DIR})
@@ -26,7 +27,9 @@ include_directories(${PROJECT_SOURCE_DIR})
 # Global shit
 file (GLOB_RECURSE LIBMEW_APP_SRC ./*.c* )
 file (GLOB_RECURSE LIBMEW_APP_HEADERS ./*.h )
-add_executable( mew_example ${LIBMEW_APP_SRC} ${LIBMEW_APP_HEADERS} )
+file ( GLOB_RECURSE LIBMEW_HEADERS ${LIBMEW_SOURCE_DIR}/include/*.h* )
+
+add_executable( mew_example ${LIBMEW_APP_SRC} ${LIBMEW_APP_HEADERS} ${LIBMEW_HEADERS} )
 set( DEPS "${DEPS};rt;pthread" )
 
 target_link_libraries ( mew_example ${DEPS} )

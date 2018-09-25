@@ -45,8 +45,8 @@ public:
 
     virtual ~Job()
     {
-        if( _joblock.try_lock() )
-            _joblock.unlock();
+//        if( _joblock.try_lock() )
+//            _joblock.unlock();
     }
 
     Job& operator =( const Job& other )
@@ -62,21 +62,13 @@ public:
         };
     }
 
-    void lock()
-    {
-        _joblock.lock();
-    }
-
-    void unlock()
-    {
-        _joblock.unlock();
-    }
-
     void pushChild(Job* j );
 
-    void run()
+    void run(JobWorker* worker)
     {
-//        cerr << "JOB:" << _label << endl;
+        _joblock.lock();
+        _assignedWorker.store( worker );
+        //        cerr << "JOB:" << _label << endl;
 #ifdef MEW_USE_PROFILING
         rmt_BeginCPUSampleDynamic( _label.c_str(), 0);
 #endif
@@ -84,6 +76,8 @@ public:
 #ifdef MEW_USE_PROFILING
         rmt_EndCPUSample();
 #endif
+        _assignedWorker.store( 0 );
+        _joblock.unlock();
     }
 
     void test()
@@ -104,11 +98,6 @@ public:
     std::string& label()
     {
         return _label;
-    }
-
-    void setWorker( JobWorker* w )
-    {
-        _assignedWorker.store( w );
     }
 
 private:
@@ -256,18 +245,19 @@ public:
 
     }
 
-    bool trySteal( Job*& j )
+    bool trySteal( Job*& j, JobWorker* caller )
     {
-        // select a worker randomly
-        size_t k = rand() % _workers.size();
-        bool ret = _workers[k]->steal( j );
-        if( ret && j == 0 )
+        JobWorker * stealWorker = caller;
+        while( stealWorker == caller )
         {
-//            cerr << "trySteal grabbed nullptr..." << endl;
-//            cerr << "k=" << k << endl;
-//            sleep(5);
+            // select a worker randomly
+            size_t k = rand() % _workers.size();
+            stealWorker = _workers[k];
         }
+
+        bool ret = stealWorker->steal( j );
         return ret & (j != nullptr);
+
     }
 
 private:
@@ -327,17 +317,8 @@ void JobWorker::run()
         Job* j = nullptr;
         if( pop(j) )
         {
-            j->lock();
-            //            cerr << "pop ok j = " << j << endl;
-            j->setWorker( this );
-            //            cerr << "will run" << endl;
-            j->run();
-            //            cerr << "has run" << endl;
-            j->setWorker( nullptr );
-            //            delete j;
-            j->unlock();
+            j->run( this );
             delete j;
-            continue;
         }
         else
         {
@@ -345,17 +326,9 @@ void JobWorker::run()
             if( _parentScheduler )
             {
                 //                cerr << "parent=" << _parentScheduler << endl;
-                if( _parentScheduler->trySteal( j ) )
+                if( _parentScheduler->trySteal( j, this ) )
                 {
-                    j->lock();
-                    //            cerr << "pop ok j = " << j << endl;
-                    j->setWorker( this );
-                    //            cerr << "will run" << endl;
-                    j->run();
-                    //            cerr << "has run" << endl;
-                    j->setWorker( nullptr );
-                    //            delete j;
-                    j->unlock();
+                    j->run(this);
                     delete j;
                 }
                 else

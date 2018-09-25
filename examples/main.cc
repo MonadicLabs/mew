@@ -80,13 +80,13 @@ void timer_func1( double dt_usec )
 {
     cerr << "timer_func1 dt=" << dt_usec << endl;
     //    usleep(100000);
-    // burn_cpu(1e3);
+    burn_cpu(1e3);
 }
 
 void timer_func2( double dt_usec )
 {
     cerr << "timer_func2 dt=" << dt_usec << endl;
-    // burn_cpu(1e6);
+    burn_cpu(1e4);
 }
 
 void io_test1( int fd )
@@ -94,8 +94,8 @@ void io_test1( int fd )
 //    cerr << "cocou" << endl;
     char buf[1024];
     int rr = read( fd, buf, 1024 );
-    cerr << "read " << rr << "bytes " << endl;
-    // burn_cpu(1e6);
+    cerr << "read " << rr << " bytes " << " from fd=" << fd << endl;
+    burn_cpu(1e6);
 }
 
 int main( int argc, char** argv )
@@ -111,12 +111,12 @@ int main( int argc, char** argv )
     //        sleep(5);
 
     mew::Mew m;
-    double dt = 0.1;
+    double dt = 0.001;
     for( int k = 0; k < 1; ++k )
     {
         m.timer( timer_func2, dt );
     }
-    m.timer( timer_func1, 0.1 );
+    m.timer( timer_func1, 0.02 );
 
     // UDP TEST
     #define BUFLEN 512

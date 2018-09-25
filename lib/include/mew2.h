@@ -145,26 +145,26 @@ double _ioTimeoutSecs;
 void processIO()
 {
     _ioLock.lock();
-    // cerr << "processIO" << endl;
+//     cerr << "processIO" << endl;
     std::vector<struct pollfd> pfds;
     std::map< int, IOReference* > _callbacks;
     for( IOReference* ioref : _ioRefs )
     {
-        if( ioref->processed == 0 )
+//        if( ioref->processed == 0 )
         {
             pfds.push_back({ ioref->fd, POLLIN, 0} );
             _callbacks.insert( make_pair( ioref->fd, ioref ) );
         }
     }
-    int ret = ::poll(&pfds[0], pfds.size(), 10.0 );
+    int ret = ::poll(&pfds[0], pfds.size(), 1.0 );
     if(ret < 0){
         // TODO
         // throw std::runtime_error(std::string("poll: ") + std::strerror(errno));
-        cerr << "poll ERRROR!" << endl;
+//        cerr << "poll ERRROR!" << endl;
     }
     else if( ret == 0 )
     {
-        //            cerr << "timeout !" << endl;
+//                    cerr << "timeout !" << endl;
     }
     else
     {
@@ -172,18 +172,15 @@ void processIO()
         {
             if(p.revents == POLLIN)
             {
-//                cerr << "data ready ?" << endl;
                 p.revents = 0;
-                _callbacks[ p.fd ]->processed = 1;
-                Job * ioJob = new Job( []( Job* j ){
-                    IOReference * ior = (IOReference*)(j->userData());
-                    ior->f( ior->fd );
-                    ior->processed = 0;
-                }, _callbacks[ p.fd ] );
-                ioJob->label() = "IO_CALLBACK";
-                _scheduler->push( ioJob );
+#ifdef MEW_USE_PROFILING
+        rmt_BeginCPUSample( IO_CALLBACK, 0);
+#endif
+                _callbacks[ p.fd ]->f( p.fd );
+#ifdef MEW_USE_PROFILING
+        rmt_EndCPUSample();
+#endif
             }
-
         }
     }
     _ioLock.unlock();
@@ -192,10 +189,10 @@ Job * createIOCheckJob()
 {
     Job * ioJob = new Job( []( Job* j ){
             mew::Mew * m = (mew::Mew*)j->userData();
+            j->pushChild( m->createIOCheckJob() );
             // cerr << "dlkfjdlkfjdfklj" << endl;
             m->processIO();
             // usleep(100);
-            j->pushChild( m->createIOCheckJob() );
     }, this );
     ioJob->label() = "IO_CHECK";
     return ioJob;
