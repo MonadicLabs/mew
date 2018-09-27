@@ -66,7 +66,7 @@ public:
 
     void run(JobWorker* worker)
     {
-        _joblock.lock();
+        // _joblock.lock();
         _assignedWorker.store( worker );
         //        cerr << "JOB:" << _label << endl;
 #ifdef MEW_USE_PROFILING
@@ -77,7 +77,7 @@ public:
         rmt_EndCPUSample();
 #endif
         _assignedWorker.store( 0 );
-        _joblock.unlock();
+        // _joblock.unlock();
     }
 
     void test()

@@ -4,6 +4,9 @@
 
 #include <poll.h>
 
+#include <cppbackports/any.h>
+
+#include "blockingconcurrentqueue.h"
 #include "jobworker.h"
 #include "timer.h"
 
@@ -15,17 +18,19 @@ class Mew
 
     typedef struct
     {
+        Mew* context;
         Timer t;
         double dt_sec;
         double approach;
-        std::function<void(double)> f;
+        std::function<void(Mew*, double)> f;
         std::atomic< int > processed;
     } TimerReference;
 
     typedef struct
     {
-        std::function<void(int)> f;
+        std::function<void(Mew*, int)> f;
         int fd;
+        Mew* context;
         std::atomic<int> processed;
     } IOReference;
 
@@ -47,22 +52,20 @@ public:
     {
         //
         Job * timerJob = createTimerCheckJob();
-        Job * ioJob = createIOCheckJob();
-        _scheduler->push( ioJob );
         _scheduler->push( timerJob );
         return _scheduler->run();
     }
 
     template<typename R, typename Arg>
-    void timer( R (*fptr)(Arg), double dt_usec )
+    void * timer( R (*fptr)(Mew*, Arg), double dt_usec )
     {
         cerr << "timer fptr" << endl;
-        std::function<R(Arg)> f = static_cast<std::function<R(Arg)> >(fptr);
-        this->timer( f, dt_usec );
+        std::function<R(Mew*, Arg)> f = static_cast<std::function<R(Mew*, Arg)> >(fptr);
+        return this->timer( f, dt_usec );
     }
 
     template<typename R, typename Arg>
-    void timer( std::function<R(Arg)> f, double dt_sec )
+    void * timer( std::function<R(Mew*, Arg)> f, double dt_sec )
     {
         cerr << "timer std::function" << endl;
         TimerReference* tref = new TimerReference();
@@ -71,26 +74,101 @@ public:
         tref->f = f;
         tref->t.reset();
         tref->processed = 0;
+        tref->context = this;
         _timerRefs.push_back( tref );
+        return (void*)tref;
     }
 
     template<typename R, typename Arg>
-    void io( R (*fptr)(Arg), int filedescriptor )
+    void * io( R (*fptr)(Mew*, Arg), int filedescriptor )
     {
         cerr << "io fptr" << endl;
-        std::function<R(Arg)> f = static_cast<std::function<R(Arg)> >(fptr);
-        this->io( f, filedescriptor );
+        std::function<R(Mew*, Arg)> f = static_cast<std::function<R(Mew*, Arg)> >(fptr);
+        return this->io( f, filedescriptor );
     }
 
     template<typename R, typename Arg>
-    void io( std::function<R(Arg)> f, int filedescriptor )
+    void  * io( std::function<R(Mew*, Arg)> f, int filedescriptor )
     {
+
+        Job * ioJob = createIOCheckJob();
+        _scheduler->push( ioJob );
+
         cerr << "io std::function" << endl;
         IOReference * ioref = new IOReference();
         ioref->fd = filedescriptor;
         ioref->f = f;
         ioref->processed = 0;
+        ioref->context = this;
         _ioRefs.push_back( ioref );
+        return (void*)ioref;
+    }
+
+    template<typename R, typename Arg>
+    void * subscribe( const std::string& topic, R(*fptr)(Mew*, Arg) )
+    {
+        std::function<R(Mew*, Arg)> f = static_cast<std::function<R(Mew*, Arg)> >(fptr);
+        return subscribe( topic, f );
+    }
+
+    template<typename R, typename Arg>
+    void * subscribe( const std::string& topic, std::function<R(Mew*, Arg)> f )
+    {
+        cerr << "template<typename R, typename ...Args>" << endl;
+                cerr << "tyepid=" << typeid(Arg).name() << endl;
+        SubscriptionReference* sref = new SubscriptionReference();
+        sref->expected_type = typeid(Arg).hash_code();
+        sref->context = this;
+        sref->f = [f, this](cpp::any aobj){
+            Arg couille0;
+            try{
+                couille0 = cpp::any_cast<Arg>( aobj );
+            }
+            catch ( cpp::bad_any_cast& e )
+            {
+                return;
+            }
+            f(this, couille0);
+        };
+
+        if( _subscriptions.find( topic ) == _subscriptions.end() )
+        {
+            std::vector< SubscriptionReference* > srefs;
+            _subscriptions.insert( std::make_pair(topic, srefs) );
+        }
+
+        {
+            auto& sl = _subscriptions[ topic ];
+            sl.push_back( sref );
+        }
+
+        return (void*)sref;
+
+    }
+
+    template<typename T>
+    void publish( const std::string& topic, T&& obj )
+    {
+        // Look for subscriber
+        if( _subscriptions.find( topic ) != _subscriptions.end() )
+        {
+            auto& sl = _subscriptions[ topic ];
+            for( SubscriptionReference* sref : sl )
+            {
+                cpp::any aobj = obj;
+                sref->queue.enqueue( aobj );
+                Job * j = new Job( []( Job* j ){
+                    SubscriptionReference * sref = (SubscriptionReference*)(j->userData());
+                    sref->context->processSubscriber( sref );
+                }, sref);
+                j->label() = "JOB_SUB_TICK";
+                _scheduler->push( j );
+            }
+        }
+        else
+        {
+            cerr << "Could not find topic \"" << topic << "\" to push to ." << endl;
+        }
     }
 
 private:
@@ -105,7 +183,7 @@ private:
         for( int i = 0; i < _timerRefs.size(); ++i )
         {
             TimerReference* tref = _timerRefs[i];
-            if( tref->t.elapsed() > tref->dt_sec && tref->processed == 0 )
+            if( tref->processed == 0 && tref->t.elapsed() > tref->dt_sec )
             {
                 ret.push_back(tref);
             }
@@ -121,18 +199,27 @@ private:
                 std::vector< TimerReference* > trigList = m->processTimers();
                 for( TimerReference* tref : trigList )
                 {
+
+                    tref->processed = 1;
+                    tref->f( tref->context, tref->t.elapsed() );
+                    tref->t.reset();
+                    tref->processed = 0;
+
+                /*
                     tref->processed = 1;
                     mew::Job * trigJob = new Job( []( mew::Job* j ) {
                         TimerReference * tr = (TimerReference*)j->userData();
-                        tr->f( tr->t.elapsed() );
-                        tr->processed = 0;
+                        tr->f( tr->context, tr->t.elapsed() );
                         tr->t.reset();
+                        tr->processed = 0;
                     }, tref );
                     trigJob->label() = "TIMER_CALLBACK";
                     j->pushChild( trigJob );
+                */
+
                 }
+                usleep(10);
                 // Should be half the smallest timer tick value
-                usleep(100);
         }, this );
         timerJob->label() = "TIMER_CHECK";
         return timerJob;
@@ -144,7 +231,7 @@ std::vector< IOReference* > _ioRefs;
 double _ioTimeoutSecs;
 void processIO()
 {
-    _ioLock.lock();
+//    _ioLock.lock();
 //     cerr << "processIO" << endl;
     std::vector<struct pollfd> pfds;
     std::map< int, IOReference* > _callbacks;
@@ -176,14 +263,21 @@ void processIO()
 #ifdef MEW_USE_PROFILING
         rmt_BeginCPUSample( IO_CALLBACK, 0);
 #endif
-                _callbacks[ p.fd ]->f( p.fd );
+                _callbacks[ p.fd ]->f( _callbacks[ p.fd ]->context, p.fd );
+//                Job * ioJob = new Job( []( Job* j ){
+//                    IOReference* ioref = (IOReference*)j->userData();
+//                    ioref->f( ioref->context, ioref->fd );
+//                }, _callbacks[ p.fd ] );
+
 #ifdef MEW_USE_PROFILING
         rmt_EndCPUSample();
 #endif
+//                this->_scheduler->push( ioJob );
+
             }
         }
     }
-    _ioLock.unlock();
+//    _ioLock.unlock();
 }
 Job * createIOCheckJob()
 {
@@ -197,6 +291,28 @@ Job * createIOCheckJob()
     ioJob->label() = "IO_CHECK";
     return ioJob;
 }
+
+// PUB/SUB
+typedef struct
+{
+    size_t expected_type;
+    std::function<void(cpp::any)> f;
+    moodycamel::ConcurrentQueue< cpp::any > queue;
+    std::mutex lock;
+    Mew* context;
+} SubscriptionReference;
+std::map< std::string, std::vector< SubscriptionReference* > > _subscriptions;
+
+void processSubscriber( SubscriptionReference* sref )
+{
+    cpp::any aobj;
+    while( sref->queue.try_dequeue( aobj ) )
+    {
+        sref->f( aobj );
+    }
+}
+
+//
 
 protected:
 

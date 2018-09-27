@@ -1,7 +1,8 @@
 #pragma once
 
 #include <abstractqueue.h>
-#include <workstealingqueue_impl2.h>
+// #include <workstealingqueue_impl2.h>
+#include "mpmc_bounded_queue.h"
 
 namespace mew
 {
@@ -21,27 +22,28 @@ namespace mew
 
         bool push( const T& item )
         {
-            return _impl.Push( item );
+            return _impl.push( item );
         }
 
         bool pop( T& item )
         {
-            return _impl.Pop( item );
+            return _impl.pop( item );
         }
 
         bool steal( T& item )
         {
-            return _impl.Steal( item );
+            return _impl.pop( item );
         }
 
         size_t size()
         {
-            return _impl.size();
+//            return _impl.size();
+            return 0;
         }
 
     private:
         // IMPL 2
-        WorkStealingStack<T> _impl;
+        tp::MPMCBoundedQueue<T> _impl;
 
     protected:
 

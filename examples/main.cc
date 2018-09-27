@@ -76,30 +76,88 @@ void job_func1( mew::Job* j )
 }
 */
 
-void timer_func1( double dt_usec )
+void sub1( mew::Mew* ctx, std::string msg )
 {
-    cerr << "timer_func1 dt=" << dt_usec << endl;
-    //    usleep(100000);
-    burn_cpu(1e3);
+    cerr << "msg=" << msg << endl;
+    std::string str = msg;
+    std::transform(str.begin(), str.end(),str.begin(), ::toupper);
+    ctx->publish( "capital", str );
 }
 
-void timer_func2( double dt_usec )
+void sub2( mew::Mew* ctx, std::string msg )
+{
+    cerr << "upper_cased: " << msg << endl;
+//    ctx->publish( "popo", msg );
+}
+
+int cpt=0;
+void timer_func1( mew::Mew* ctx, double dt_usec )
+{
+    // cerr << "timer_func1 dt=" << dt_usec << endl;
+    //    usleep(100000);
+    // burn_cpu(1e3);
+    stringstream sstr;
+    sstr << "coucou_" << cpt++;
+    ctx->publish( "popo", sstr.str() );
+}
+
+void timer_func2( mew::Mew* ctx, double dt_usec )
 {
     cerr << "timer_func2 dt=" << dt_usec << endl;
-    burn_cpu(1e4);
-}
-
-void io_test1( int fd )
-{
-//    cerr << "cocou" << endl;
-    char buf[1024];
-    int rr = read( fd, buf, 1024 );
-    cerr << "read " << rr << " bytes " << " from fd=" << fd << endl;
     burn_cpu(1e6);
 }
 
+void io_test1( mew::Mew* ctx, int fd )
+{
+    //    cerr << "cocou" << endl;
+    char buf[1024];
+    int rr = read( fd, buf, 1024 );
+    stringstream sstr;
+    sstr << "read " << rr << " bytes " << " from fd=" << fd << endl;
+    ctx->publish( "popo", sstr.str() );
+    burn_cpu(1e6);
+}
+
+class TestClass
+{
+
+public:
+    TestClass()
+    {
+        std::function<void(mew::Mew*,double)> tf = std::bind( &TestClass::tick, this, std::placeholders::_1, std::placeholders::_2 );
+        _mew.timer( tf, 0.001 );
+        _mew.run();
+    }
+
+    virtual ~TestClass()
+    {
+
+    }
+
+    void tick( mew::Mew* context, double dt )
+    {
+        cerr << "tick !" << endl;
+    }
+
+private:
+    mew::Mew _mew;
+};
+
 int main( int argc, char** argv )
 {
+
+//    TestClass test;
+//    return 0;
+
+//    cptcall = 0;
+//    mew::JobScheduler * sched = new mew::JobScheduler(3);
+//    for( unsigned int k = 0; k < 1; ++k )
+//    {
+//        mew::Job* j = createEmptyJob( sched );
+//        sched->push( j );
+//    }
+//    sched->run();
+//    return 0;
 
     //    WorkStealingStack< std::shared_ptr< int > > test;
     //    test.Push( std::make_shared<int>() );
@@ -110,18 +168,40 @@ int main( int argc, char** argv )
 
     //        sleep(5);
 
-    mew::Mew m;
-    double dt = 0.001;
-    for( int k = 0; k < 1; ++k )
+    std::deque< cpp::any > anyqueue;
+    for( int i = 0; i < 1000000; ++i )
     {
-        m.timer( timer_func2, dt );
+        if( i % 2 == 0 )
+        {
+            anyqueue.push_back( 1234.0 );
+        }
+        else
+        {
+            anyqueue.push_back( std::string("coucou") );
+        }
     }
-    m.timer( timer_func1, 0.02 );
+    cerr << "done queue " << endl;
+
+    int udpPort = 9940 + rand() % 1000;
+    cerr << "udpPort=" << udpPort << endl;
+
+    mew::Mew m;
+    double dt = 0.01;
+    //    for( int k = 0; k < 1; ++k )
+    //    {
+    //        m.timer( timer_func2, dt );
+    //    }
+    m.subscribe( "popo", sub1 );
+    m.subscribe( "capital", sub2 );
+
+    m.timer( timer_func1, dt );
+    m.timer( timer_func2, 0.2 );
+    m.timer( timer_func2, 0.01 );
 
     // UDP TEST
-    #define BUFLEN 512
-    #define NPACK 10
-    #define PORT 9940
+#define BUFLEN 512
+#define NPACK 10
+
     struct sockaddr_in si_me, si_other;
     int s, i, slen=sizeof(si_other);
     char buf[BUFLEN];
@@ -132,7 +212,7 @@ int main( int argc, char** argv )
 
     memset((char *) &si_me, 0, sizeof(si_me));
     si_me.sin_family = AF_INET;
-    si_me.sin_port = htons(PORT);
+    si_me.sin_port = htons(udpPort);
     si_me.sin_addr.s_addr = htonl(INADDR_ANY);
     if (::bind(s, (const sockaddr*)(&si_me), sizeof(si_me))==-1)
         cerr << ":( bind" << endl;
