@@ -155,14 +155,23 @@ public:
             auto& sl = _subscriptions[ topic ];
             for( SubscriptionReference* sref : sl )
             {
+            	
                 cpp::any aobj = obj;
+
                 sref->queue.enqueue( aobj );
                 Job * j = new Job( []( Job* j ){
                     SubscriptionReference * sref = (SubscriptionReference*)(j->userData());
-                    sref->context->processSubscriber( sref );
+                    cpp::any pol;
+                    if( sref->queue.try_dequeue( pol ) )
+                    {
+                    	sref->f( pol );
+                    }
                 }, sref);
                 j->label() = "JOB_SUB_TICK";
                 _scheduler->push( j );
+                
+                // sref->f( aobj );
+                // cerr << "publish." << endl;
             }
         }
         else
@@ -195,17 +204,17 @@ private:
     {
         Job * timerJob = new Job( []( Job* j ){
                 mew::Mew * m = (mew::Mew*)j->userData();
-                j->pushChild( m->createTimerCheckJob() );
                 std::vector< TimerReference* > trigList = m->processTimers();
                 for( TimerReference* tref : trigList )
                 {
 
+				/*
                     tref->processed = 1;
                     tref->f( tref->context, tref->t.elapsed() );
                     tref->t.reset();
                     tref->processed = 0;
-
-                /*
+				*/
+				
                     tref->processed = 1;
                     mew::Job * trigJob = new Job( []( mew::Job* j ) {
                         TimerReference * tr = (TimerReference*)j->userData();
@@ -215,11 +224,11 @@ private:
                     }, tref );
                     trigJob->label() = "TIMER_CALLBACK";
                     j->pushChild( trigJob );
-                */
-
+                
                 }
-                usleep(10);
+                usleep(500);
                 // Should be half the smallest timer tick value
+                j->pushChild( m->createTimerCheckJob() );
         }, this );
         timerJob->label() = "TIMER_CHECK";
         return timerJob;
@@ -243,7 +252,7 @@ void processIO()
             _callbacks.insert( make_pair( ioref->fd, ioref ) );
         }
     }
-    int ret = ::poll(&pfds[0], pfds.size(), 1.0 );
+    int ret = ::poll(&pfds[0], pfds.size(), 500.0 );
     if(ret < 0){
         // TODO
         // throw std::runtime_error(std::string("poll: ") + std::strerror(errno));
@@ -264,15 +273,18 @@ void processIO()
         rmt_BeginCPUSample( IO_CALLBACK, 0);
 #endif
                 _callbacks[ p.fd ]->f( _callbacks[ p.fd ]->context, p.fd );
-//                Job * ioJob = new Job( []( Job* j ){
-//                    IOReference* ioref = (IOReference*)j->userData();
-//                    ioref->f( ioref->context, ioref->fd );
-//                }, _callbacks[ p.fd ] );
+
+/*
+                Job * ioJob = new Job( []( Job* j ){
+                    IOReference* ioref = (IOReference*)j->userData();
+                    ioref->f( ioref->context, ioref->fd );
+                }, _callbacks[ p.fd ] );
+*/
 
 #ifdef MEW_USE_PROFILING
         rmt_EndCPUSample();
 #endif
-//                this->_scheduler->push( ioJob );
+                // this->_scheduler->push( ioJob );
 
             }
         }
@@ -283,10 +295,10 @@ Job * createIOCheckJob()
 {
     Job * ioJob = new Job( []( Job* j ){
             mew::Mew * m = (mew::Mew*)j->userData();
-            j->pushChild( m->createIOCheckJob() );
+            // j->pushChild( m->createIOCheckJob() );
             // cerr << "dlkfjdlkfjdfklj" << endl;
             m->processIO();
-            // usleep(100);
+            j->pushChild( m->createIOCheckJob() );
     }, this );
     ioJob->label() = "IO_CHECK";
     return ioJob;
@@ -306,8 +318,9 @@ std::map< std::string, std::vector< SubscriptionReference* > > _subscriptions;
 void processSubscriber( SubscriptionReference* sref )
 {
     cpp::any aobj;
-    while( sref->queue.try_dequeue( aobj ) )
+    if( sref->queue.try_dequeue( aobj ) )
     {
+    	cerr << "." << endl;
         sref->f( aobj );
     }
 }

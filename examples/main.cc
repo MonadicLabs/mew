@@ -81,7 +81,7 @@ void sub1( mew::Mew* ctx, std::string msg )
     cerr << "msg=" << msg << endl;
     std::string str = msg;
     std::transform(str.begin(), str.end(),str.begin(), ::toupper);
-    ctx->publish( "capital", str );
+    // ctx->publish( "capital", str );
 }
 
 void sub2( mew::Mew* ctx, std::string msg )
@@ -93,7 +93,7 @@ void sub2( mew::Mew* ctx, std::string msg )
 int cpt=0;
 void timer_func1( mew::Mew* ctx, double dt_usec )
 {
-    // cerr << "timer_func1 dt=" << dt_usec << endl;
+    cerr << "timer_func1 dt=" << dt_usec << endl;
     //    usleep(100000);
     // burn_cpu(1e3);
     stringstream sstr;
@@ -104,7 +104,7 @@ void timer_func1( mew::Mew* ctx, double dt_usec )
 void timer_func2( mew::Mew* ctx, double dt_usec )
 {
     cerr << "timer_func2 dt=" << dt_usec << endl;
-    burn_cpu(1e6);
+    // burn_cpu(1e6);
 }
 
 void io_test1( mew::Mew* ctx, int fd )
@@ -114,8 +114,9 @@ void io_test1( mew::Mew* ctx, int fd )
     int rr = read( fd, buf, 1024 );
     stringstream sstr;
     sstr << "read " << rr << " bytes " << " from fd=" << fd << endl;
-    ctx->publish( "popo", sstr.str() );
-    burn_cpu(1e6);
+    // ctx->publish( "popo", sstr.str() );
+    // burn_cpu(1e6);
+	cerr << sstr.str();
 }
 
 class TestClass
@@ -186,7 +187,7 @@ int main( int argc, char** argv )
     cerr << "udpPort=" << udpPort << endl;
 
     mew::Mew m;
-    double dt = 0.01;
+    double dt = 0.001;
     //    for( int k = 0; k < 1; ++k )
     //    {
     //        m.timer( timer_func2, dt );
@@ -195,8 +196,10 @@ int main( int argc, char** argv )
     m.subscribe( "capital", sub2 );
 
     m.timer( timer_func1, dt );
-    m.timer( timer_func2, 0.2 );
-    m.timer( timer_func2, 0.01 );
+    m.timer( timer_func1, dt * 2.0 );
+    m.timer( timer_func1, dt * 4.0 );
+    // m.timer( timer_func2, 0.002 );
+    // m.timer( timer_func2, 0.001 );
 
     // UDP TEST
 #define BUFLEN 512
