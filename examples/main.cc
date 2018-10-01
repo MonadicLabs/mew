@@ -6,7 +6,7 @@ using namespace std;
 
 #include <unistd.h>
 
-#include <mew2.h>
+#include <mew.h>
 #include <workstealingqueue_impl2.h>
 #include <jobworker.h>
 
@@ -18,6 +18,9 @@ using namespace std;
 #include <unistd.h>
 #include <cstring>
 
+#include "node.h"
+#include "graph.h"
+#include "value.h"
 
 // IO
 #include <arpa/inet.h>
@@ -76,11 +79,11 @@ void job_func1( mew::Job* j )
 }
 */
 
-void sub1( mew::Mew* ctx, std::string msg )
+void sub1( mew::Mew* ctx, double popo )
 {
-    cerr << "msg=" << msg << endl;
-    std::string str = msg;
-    std::transform(str.begin(), str.end(),str.begin(), ::toupper);
+    cerr << "msg=" << popo << endl;
+    // std::string str = msg.string();
+    // std::transform(str.begin(), str.end(),str.begin(), ::toupper);
     // ctx->publish( "capital", str );
 }
 
@@ -104,7 +107,7 @@ void timer_func1( mew::Mew* ctx, double dt_usec )
 void timer_func2( mew::Mew* ctx, double dt_usec )
 {
     cerr << "timer_func2 dt=" << dt_usec << endl;
-    // burn_cpu(1e6);
+    burn_cpu(1e6);
 }
 
 void io_test1( mew::Mew* ctx, int fd )
@@ -114,9 +117,9 @@ void io_test1( mew::Mew* ctx, int fd )
     int rr = read( fd, buf, 1024 );
     stringstream sstr;
     sstr << "read " << rr << " bytes " << " from fd=" << fd << endl;
-    // ctx->publish( "popo", sstr.str() );
+    ctx->publish( "popo", 12345.45 );
     // burn_cpu(1e6);
-	cerr << sstr.str();
+    // cerr << sstr.str();
 }
 
 class TestClass
@@ -169,6 +172,12 @@ int main( int argc, char** argv )
 
     //        sleep(5);
 
+    /*
+    Value popov = "coucoucoucouc";
+    cerr << popov.is(Value::STRING) << endl;
+    std::string prololol = popov;
+    */
+
     std::deque< cpp::any > anyqueue;
     for( int i = 0; i < 1000000; ++i )
     {
@@ -188,18 +197,16 @@ int main( int argc, char** argv )
 
     mew::Mew m;
     double dt = 0.001;
-    //    for( int k = 0; k < 1; ++k )
-    //    {
-    //        m.timer( timer_func2, dt );
-    //    }
+        for( int k = 0; k < 10; ++k )
+        {
+            m.timer( timer_func2, 0.1 );
+        }
     m.subscribe( "popo", sub1 );
-    m.subscribe( "capital", sub2 );
+//    m.subscribe( "capital", sub2 );
 
-    m.timer( timer_func1, dt );
-    m.timer( timer_func1, dt * 2.0 );
-    m.timer( timer_func1, dt * 4.0 );
-    // m.timer( timer_func2, 0.002 );
-    // m.timer( timer_func2, 0.001 );
+//    m.timer( timer_func1, dt );
+//    m.timer( timer_func1, dt * 2.0 );
+//    m.timer( timer_func1, dt * 4.0 );
 
     // UDP TEST
 #define BUFLEN 512
@@ -222,6 +229,7 @@ int main( int argc, char** argv )
     m.io( io_test1, s );
     //
 
+    mew::Node popo( &m );
     m.run();
 
     //    srand( time(NULL) );
