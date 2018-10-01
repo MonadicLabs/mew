@@ -3,13 +3,14 @@
 #include "mew.h"
 #include "port.h"
 #include "identifiable.h"
+#include "parameterizable.h"
 
 #include <iostream>
 using namespace std;
 
 namespace mew
 {
-    class Node : public ShortIdentifiable
+    class Node : public ShortIdentifiable, public Parameterizable
     {
 
     public:
