@@ -21,6 +21,7 @@ using namespace std;
 #include "node.h"
 #include "graph.h"
 #include "value.h"
+#include "connection.h"
 
 // IO
 #include <arpa/inet.h>
@@ -90,7 +91,7 @@ void sub1( mew::Mew* ctx, double popo )
 void sub2( mew::Mew* ctx, std::string msg )
 {
     cerr << "upper_cased: " << msg << endl;
-//    ctx->publish( "popo", msg );
+    //    ctx->publish( "popo", msg );
 }
 
 int cpt=0;
@@ -107,7 +108,9 @@ void timer_func1( mew::Mew* ctx, double dt_usec )
 void timer_func2( mew::Mew* ctx, double dt_usec )
 {
     cerr << "timer_func2 dt=" << dt_usec << endl;
-    burn_cpu(1e6);
+    ctx->publish( "in0", std::string("polbak") );
+    ctx->publish( "in0", Value( 260986.1234 ) );
+    burn_cpu(1e2);
 }
 
 void io_test1( mew::Mew* ctx, int fd )
@@ -122,46 +125,40 @@ void io_test1( mew::Mew* ctx, int fd )
     // cerr << sstr.str();
 }
 
-class TestClass
+class TestNode : public mew::Node
 {
-
 public:
-    TestClass()
+    TestNode( mew::Mew* ctx, mew::Graph* parent )
+        :Node( ctx, parent )
     {
-        std::function<void(mew::Mew*,double)> tf = std::bind( &TestClass::tick, this, std::placeholders::_1, std::placeholders::_2 );
-        _mew.timer( tf, 0.001 );
-        _mew.run();
+        declare_input( "in0" );
+        declare_output( "out0" );
+        declare_parameter( "width", Value::NUMBER, 800 );
+        // declare_input( )
     }
 
-    virtual ~TestClass()
+    virtual ~TestNode()
     {
 
     }
 
-    void tick( mew::Mew* context, double dt )
-    {
-        cerr << "tick !" << endl;
-    }
-
-private:
-    mew::Mew _mew;
 };
 
 int main( int argc, char** argv )
 {
 
-//    TestClass test;
-//    return 0;
+    //    TestClass test;
+    //    return 0;
 
-//    cptcall = 0;
-//    mew::JobScheduler * sched = new mew::JobScheduler(3);
-//    for( unsigned int k = 0; k < 1; ++k )
-//    {
-//        mew::Job* j = createEmptyJob( sched );
-//        sched->push( j );
-//    }
-//    sched->run();
-//    return 0;
+    //    cptcall = 0;
+    //    mew::JobScheduler * sched = new mew::JobScheduler(3);
+    //    for( unsigned int k = 0; k < 1; ++k )
+    //    {
+    //        mew::Job* j = createEmptyJob( sched );
+    //        sched->push( j );
+    //    }
+    //    sched->run();
+    //    return 0;
 
     //    WorkStealingStack< std::shared_ptr< int > > test;
     //    test.Push( std::make_shared<int>() );
@@ -197,16 +194,16 @@ int main( int argc, char** argv )
 
     mew::Mew m;
     double dt = 0.001;
-        for( int k = 0; k < 10; ++k )
-        {
-            m.timer( timer_func2, 0.1 );
-        }
+    for( int k = 0; k < 1; ++k )
+    {
+        m.timer( timer_func2, 0.0001 );
+    }
     m.subscribe( "popo", sub1 );
-//    m.subscribe( "capital", sub2 );
+    //    m.subscribe( "capital", sub2 );
 
-//    m.timer( timer_func1, dt );
-//    m.timer( timer_func1, dt * 2.0 );
-//    m.timer( timer_func1, dt * 4.0 );
+    //    m.timer( timer_func1, dt );
+    //    m.timer( timer_func1, dt * 2.0 );
+    //    m.timer( timer_func1, dt * 4.0 );
 
     // UDP TEST
 #define BUFLEN 512
@@ -229,7 +226,20 @@ int main( int argc, char** argv )
     m.io( io_test1, s );
     //
 
-    mew::Node popo( &m );
+    std::thread popo([&](){
+        while(true)
+        {
+            sleep(1);
+            mew::Graph g( &m );
+            TestNode popo( &m, &g );
+            TestNode popo2( &m, &g );
+            mew::Connection conn( popo.out("out0"), popo2.in("in0") );
+            sleep(1);
+        }
+    });
+
+    sleep(1);
+
     m.run();
 
     //    srand( time(NULL) );

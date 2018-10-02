@@ -13,7 +13,30 @@ namespace mew
         Parameterizable(){}
         virtual ~Parameterizable(){}
 
-        bool declare_parameter(const std::string &paramName, Value::Type type, Value defaultValue);
+        virtual bool declare_parameter(const std::string &paramName, Value::Type type, Value defaultValue)
+        {
+            if( _parameters.find(paramName) != _parameters.end() )
+            {
+                // Parameter already exists
+                // LOG_S(WARNING)
+                return false;
+            }
+            else
+            {
+                Value val( type );
+                if( val.type() != defaultValue.type() )
+                {
+                    // Oops type mismatch
+                    return false;
+                }
+                else
+                {
+                    val = defaultValue;
+                }
+                _parameters.insert( make_pair( paramName, val ) );
+                return true;
+            }
+        }
         Value getParameter( const std::string& paramName );
         std::vector< std::string > getParameterList();
         void setParameter( const std::string& paramName, Value value, bool triggerEvent = true );

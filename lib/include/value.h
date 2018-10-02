@@ -89,6 +89,11 @@ public:
         return *this;
     }
 
+    Value::Type type()
+    {
+        return _type;
+    }
+
     bool is(Value::Type t)
     {
         return t == _type;

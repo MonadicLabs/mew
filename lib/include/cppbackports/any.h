@@ -212,10 +212,10 @@ T any_cast(const any& a)
 {
 	const std::type_info& ti = typeid( T );
 
-	if ( a.type() != ti )
-	{
-		throw bad_any_cast(ti);
-	}
+    if ( a.type() != ti )
+    {
+        throw bad_any_cast(ti);
+    }
 
 	return static_cast< any::actual< T >* >( a.value )->x;
 }

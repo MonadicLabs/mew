@@ -11,8 +11,8 @@ namespace mew
     class Graph : public Node
     {
     public:
-        Graph( Mew* context )
-            :Node(context)
+        Graph( Mew* context, Graph* parent = 0 )
+            :Node(context, parent)
         {
 
         }
