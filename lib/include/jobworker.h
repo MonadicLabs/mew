@@ -1,3 +1,5 @@
+#ifndef JOBWORKER_H
+#define JOBWORKER_H
 #pragma once
 
 #include <thread>
@@ -347,3 +349,4 @@ void JobWorker::run()
 #include "Remotery.c"
 #endif
 
+#endif

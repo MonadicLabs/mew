@@ -1,3 +1,5 @@
+#ifndef MEW_H
+#define MEW_H
 #pragma once
 
 #include <map>
@@ -400,3 +402,5 @@ mew::Mew* mew_init( int argc, char** argv )
 }
 
 }
+
+#endif

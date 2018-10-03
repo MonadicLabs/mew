@@ -4,6 +4,7 @@ project(MEW)
 
 option(BUILD_EXAMPLE_APPS "Build Example Applications" ON)
 option(BUILD_TESTS "Build Tests" OFF)
+option(BUILD_DAEMON "Build mew dameon" ON )
 
 add_subdirectory(lib)
 
@@ -14,3 +15,7 @@ endif( BUILD_EXAMPLE_APPS )
 if( BUILD_TESTS )
     add_subdirectory( tests )
 endif( BUILD_TESTS )
+
+if( BUILD_DAEMON )
+    add_subdirectory( server )
+endif()
