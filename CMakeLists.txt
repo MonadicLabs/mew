@@ -5,6 +5,8 @@ project(MEW)
 option(BUILD_EXAMPLE_APPS "Build Example Applications" ON)
 option(BUILD_TESTS "Build Tests" OFF)
 option(BUILD_DAEMON "Build mew dameon" ON )
+option(BUILD_STATIC_LIB "Build static library" ON)
+option(USE_LOGGER "Use logging capabilities" OFF)
 
 add_subdirectory(lib)
 

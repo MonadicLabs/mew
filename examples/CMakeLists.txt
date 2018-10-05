@@ -19,17 +19,17 @@ else()
 endif()
 ##
 
-SET( CMAKE_CXX_FLAGS  "${CMAKE_CXX_FLAGS} -fpermissive -march=native" )
+SET( CMAKE_CXX_FLAGS  "${CMAKE_CXX_FLAGS} -fpermissive" )
 
 include_directories(${LIBMEW_SOURCE_DIR}/include)
 include_directories(${PROJECT_SOURCE_DIR})
 
 # Global shit
-file (GLOB_RECURSE LIBMEW_APP_SRC ./*.c* )
-file (GLOB_RECURSE LIBMEW_APP_HEADERS ./*.h )
+file ( GLOB_RECURSE LIBMEW_APP_SRC ./*.c* )
+file ( GLOB_RECURSE LIBMEW_APP_HEADERS ./*.h )
 file ( GLOB_RECURSE LIBMEW_HEADERS ${LIBMEW_SOURCE_DIR}/include/*.h* )
 
 add_executable( mew_example ${LIBMEW_APP_SRC} ${LIBMEW_APP_HEADERS} ${LIBMEW_HEADERS} )
-set( DEPS "${DEPS};rt;pthread" )
+set( DEPS "${DEPS};rt;pthread;mew" )
 
 target_link_libraries ( mew_example ${DEPS} )

@@ -5,7 +5,7 @@
 
 namespace mew
 {
-    class Connection : public ShortIdentifiable
+    class Connection : public EntityIdentifiable
     {
     public:
         Connection( Port* a, Port* b )

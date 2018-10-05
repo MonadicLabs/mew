@@ -86,6 +86,7 @@ void sub1( mew::Mew* ctx, double popo )
     // std::string str = msg.string();
     // std::transform(str.begin(), str.end(),str.begin(), ::toupper);
     // ctx->publish( "capital", str );
+    burn_cpu(1e2);
 }
 
 void sub2( mew::Mew* ctx, std::string msg )
@@ -108,8 +109,8 @@ void timer_func1( mew::Mew* ctx, double dt_usec )
 void timer_func2( mew::Mew* ctx, double dt_usec )
 {
     cerr << "timer_func2 dt=" << dt_usec << endl;
-    ctx->publish( "in0", std::string("polbak") );
-    ctx->publish( "in0", Value( 260986.1234 ) );
+    ctx->publish( "in0", Value(std::string("polbak")) );
+    // ctx->publish( "in0", Value( 260986.1234 ) );
     burn_cpu(1e2);
 }
 
@@ -128,13 +129,13 @@ void io_test1( mew::Mew* ctx, int fd )
 class TestNode : public mew::Node
 {
 public:
-    TestNode( mew::Mew* ctx, mew::Graph* parent )
+    TestNode( mew::WorkSpace* ctx, mew::Graph* parent )
         :Node( ctx, parent )
     {
         declare_input( "in0" );
         declare_output( "out0" );
         declare_parameter( "width", Value::NUMBER, 800 );
-        // declare_input( )
+        setTickInterval( 1 );
     }
 
     virtual ~TestNode()
@@ -142,39 +143,33 @@ public:
 
     }
 
+    virtual void onTimer(double dt)
+    {
+        cerr << ".. TICK " << this << " dt=" << dt << endl;
+        out("out0")->write( std::string("popo") );
+    }
+
+    virtual void onInput( const std::string& portName, cpp17::any& v )
+    {
+        cerr << this->str_id() << " received data on port " << portName << endl;
+    }
 };
 
 int main( int argc, char** argv )
 {
-
-    //    TestClass test;
-    //    return 0;
-
-    //    cptcall = 0;
-    //    mew::JobScheduler * sched = new mew::JobScheduler(3);
-    //    for( unsigned int k = 0; k < 1; ++k )
-    //    {
-    //        mew::Job* j = createEmptyJob( sched );
-    //        sched->push( j );
-    //    }
-    //    sched->run();
-    //    return 0;
-
-    //    WorkStealingStack< std::shared_ptr< int > > test;
-    //    test.Push( std::make_shared<int>() );
-
-    //    std::atomic< std::shared_ptr< int > > testa;
-    //    testa.store( std::make_shared<int>() );
-    //        mew::Job j;
-
-    //        sleep(5);
+    mew::WorkSpace * ws = new mew::WorkSpace();
+    mew::Graph * g = ws->createEmptyGraph();
+    TestNode * tn = new TestNode( ws, 0 );
+    TestNode * tn2 = new TestNode( ws, 0 );
+    g->addNode( tn );
+    g->addNode( tn2 );
+    cerr << "tn id=" << tn->str_id() << endl;
+    cerr << "tn2 id=" << tn2->str_id() << endl;
+    g->addConnection( tn->out("out0"), tn2->in("in0") );
+    cerr << "this is a test" << endl;
+    ws->run();
 
     /*
-    Value popov = "coucoucoucouc";
-    cerr << popov.is(Value::STRING) << endl;
-    std::string prololol = popov;
-    */
-
     std::deque< cpp::any > anyqueue;
     for( int i = 0; i < 1000000; ++i )
     {
@@ -196,7 +191,7 @@ int main( int argc, char** argv )
     double dt = 0.001;
     for( int k = 0; k < 1; ++k )
     {
-        m.timer( timer_func2, 0.0001 );
+        m.timer( timer_func2, 0.001 );
     }
     m.subscribe( "popo", sub1 );
     //    m.subscribe( "capital", sub2 );
@@ -263,8 +258,10 @@ int main( int argc, char** argv )
     //    mew::JobScheduler sched;
     //    sched.push( new mew::Job( job_func1 ) );
     //    sched.run();
+    */
 
-    //    return 0;
+    return 0;
+
 }
 
 /*

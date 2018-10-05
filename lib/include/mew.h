@@ -13,6 +13,8 @@
 #include "timer.h"
 #include "safe_ptr.h"
 
+#include <unistd.h>
+
 namespace mew
 {
 
@@ -36,12 +38,23 @@ class Mew
         std::atomic<int> processed;
     } IOReference;
 
+    typedef struct
+    {
+        size_t expected_type;
+        std::function<void(cpp::any)> f;
+        moodycamel::ConcurrentQueue< cpp::any > queue;
+        std::mutex lock;
+        Mew* context;
+        std::atomic<int> jobCpt;
+    } SubscriptionReference;
+
 public:
     Mew()
     {
+        _minTimerInterval = 1.0;
         int numAdditionnalThreads = std::thread::hardware_concurrency() - 1;
-        //                int numAdditionnalThreads = 0;
-        cerr << "Number of additionnal threads = " << numAdditionnalThreads << endl;
+        // cerr << "Number of additionnal threads = " << numAdditionnalThreads << endl;
+        // numAdditionnalThreads = 3;
         _scheduler = std::make_shared<mew::JobScheduler>( numAdditionnalThreads );
     }
 
@@ -52,7 +65,6 @@ public:
 
     void run()
     {
-        //
         Job * timerJob = createTimerCheckJob();
         _scheduler->push( timerJob );
         return _scheduler->run();
@@ -78,18 +90,9 @@ public:
         tref->processed = 0;
         tref->context = this;
         _timerRefs.push_back( tref );
+        if( tref->dt_sec < _minTimerInterval )
+            _minTimerInterval = tref->dt_sec;
         return (void*)tref;
-    }
-
-    void set_timer_interval( void* timer_ref, double dt_secs )
-    {
-        for( TimerReference* tref : _timerRefs )
-        {
-            if( tref == timer_ref )
-            {
-                tref->dt_sec = dt_secs;
-            }
-        }
     }
 
     template<typename R, typename Arg>
@@ -161,47 +164,12 @@ public:
 
     }
 
-    bool unsubscribe( void* subReference )
-    {
-        std::unique_lock< std::mutex >( _subRegistryMtx );
-        bool removed = false;
-        for( auto& kv : _subscriptions )
-        {
-            int idx = -1;
-            for( int k = 0; k < kv.second.size(); ++k )
-            {
-                if( kv.second[ k ] == subReference )
-                {
-                    idx = k;
-                    removed = true;
-                    break;
-                }
-            }
-            if( idx >= 0 )
-            {
-                cerr << "idx=" << idx << endl;
-                cerr << "key=" << kv.first << " P_SUBS=" << kv.second.size() << endl;
-                SubscriptionReference* csubref = (SubscriptionReference*)subReference;
-                kv.second.erase( kv.second.begin() + idx );
-                // Wait for jobs completion
-                while( csubref->jobCpt != 0 )
-                {
-                    usleep(1000);
-                }
-                delete csubref;
-                //
-                cerr << "key=" << kv.first << " P_SUBS=" << kv.second.size() << endl;
-            }
-            if( removed )
-                break;
-        }
-        cerr << "SUBSCRIPTIONS=" << _subscriptions.size() << endl;
-        return removed;
-    }
+    bool unsubscribe( void* subReference );
 
     template<typename T>
     void publish( const std::string& topic, T&& obj )
     {
+        cerr << "**** TOPIC=" << topic << endl;
         std::unique_lock< std::mutex >( _subRegistryMtx );
         // Look for subscriber
         if( _subscriptions.find( topic ) != _subscriptions.end() )
@@ -216,11 +184,11 @@ public:
                         SubscriptionReference * sref = (SubscriptionReference*)(j->userData());
                         cpp::any pol;
                         if( sref->queue.try_dequeue( pol ) )
-                        {
-                            sref->f( pol );
-                        }
+                {
+                        sref->f( pol );
+            }
                         sref->jobCpt--;
-                }, sref);
+            }, sref);
                 j->label() = "JOB_SUB_TICK";
                 _scheduler->push( j );
             }
@@ -231,175 +199,37 @@ public:
         }
     }
 
-    void printSubscriptions()
-    {
-        std::unique_lock< std::mutex >( _subRegistryMtx );
-        for( auto& kv : _subscriptions )
-        {
-            cerr << "topic: " << kv.first << endl;
-            for( int k = 0; k < kv.second.size(); ++k )
-            {
-                cerr << "\t\t sref=" << kv.second[ k ] << endl;
-            }
-            cerr << endl;
-        }
-    }
+    void printSubscriptions();
+    void set_timer_interval( void* timer_ref, double dt_secs );
 
 private:
     // Job Scheduler
     std::shared_ptr< JobScheduler > _scheduler;
+
+    // Timer
     std::mutex _timerLock;
     std::vector< TimerReference* > _timerRefs;
-    std::vector< TimerReference* > processTimers()
-    {
-        std::vector< TimerReference* > ret;
-        _timerLock.lock();
-        for( int i = 0; i < _timerRefs.size(); ++i )
-        {
-            TimerReference* tref = _timerRefs[i];
-            if( tref->processed == 0 && tref->t.elapsed() > tref->dt_sec )
-            {
-                ret.push_back(tref);
-            }
-        }
-        _timerLock.unlock();
-        return ret;
-    }
-    Job * createTimerCheckJob()
-    {
-        Job * timerJob = new Job( []( Job* j ){
-                mew::Mew * m = (mew::Mew*)j->userData();
-                std::vector< TimerReference* > trigList = m->processTimers();
-                for( TimerReference* tref : trigList )
-        {
+    std::vector< TimerReference* > processTimers();
+    Job * createTimerCheckJob();
+    double _minTimerInterval;
 
-                /*
-                                                    tref->processed = 1;
-                                                    tref->f( tref->context, tref->t.elapsed() );
-                                                    tref->t.reset();
-                                                    tref->processed = 0;
-                                                */
+    // IO
+    std::mutex _ioLock;
+    std::vector< IOReference* > _ioRefs;
+    double _ioTimeoutSecs;
+    void processIO();
+    Job * createIOCheckJob();
 
-                tref->processed = 1;
-                mew::Job * trigJob = new Job( []( mew::Job* j ) {
-                TimerReference * tr = (TimerReference*)j->userData();
-                tr->f( tr->context, tr->t.elapsed() );
-                tr->t.reset();
-                tr->processed = 0;
-    }, tref );
-        trigJob->label() = "TIMER_CALLBACK";
-        j->pushChild( trigJob );
-
-    }
-    usleep(500);
-    // Should be half the smallest timer tick value
-    j->pushChild( m->createTimerCheckJob() );
-}, this );
-timerJob->label() = "TIMER_CHECK";
-return timerJob;
-}
-
-// IO
-std::mutex _ioLock;
-std::vector< IOReference* > _ioRefs;
-double _ioTimeoutSecs;
-void processIO()
-{
-    //    _ioLock.lock();
-    //     cerr << "processIO" << endl;
-    std::vector<struct pollfd> pfds;
-    std::map< int, IOReference* > _callbacks;
-    for( IOReference* ioref : _ioRefs )
-    {
-        //        if( ioref->processed == 0 )
-        {
-            pfds.push_back({ ioref->fd, POLLIN, 0} );
-            _callbacks.insert( make_pair( ioref->fd, ioref ) );
-        }
-    }
-    int ret = ::poll(&pfds[0], pfds.size(), 500.0 );
-    if(ret < 0){
-        // TODO
-        // throw std::runtime_error(std::string("poll: ") + std::strerror(errno));
-        //        cerr << "poll ERRROR!" << endl;
-    }
-    else if( ret == 0 )
-    {
-        //                    cerr << "timeout !" << endl;
-    }
-    else
-    {
-        for( struct pollfd &p : pfds)
-        {
-            if(p.revents == POLLIN)
-            {
-                p.revents = 0;
-#ifdef MEW_USE_PROFILING
-                rmt_BeginCPUSample( IO_CALLBACK, 0);
-#endif
-                _callbacks[ p.fd ]->f( _callbacks[ p.fd ]->context, p.fd );
-
-                /*
-                Job * ioJob = new Job( []( Job* j ){
-                    IOReference* ioref = (IOReference*)j->userData();
-                    ioref->f( ioref->context, ioref->fd );
-                }, _callbacks[ p.fd ] );
-*/
-
-#ifdef MEW_USE_PROFILING
-                rmt_EndCPUSample();
-#endif
-                // this->_scheduler->push( ioJob );
-
-            }
-        }
-    }
-    //    _ioLock.unlock();
-}
-Job * createIOCheckJob()
-{
-    Job * ioJob = new Job( []( Job* j ){
-            mew::Mew * m = (mew::Mew*)j->userData();
-            // j->pushChild( m->createIOCheckJob() );
-            // cerr << "dlkfjdlkfjdfklj" << endl;
-            m->processIO();
-            j->pushChild( m->createIOCheckJob() );
-}, this );
-    ioJob->label() = "IO_CHECK";
-    return ioJob;
-}
-
-// PUB/SUB
-typedef struct
-{
-    size_t expected_type;
-    std::function<void(cpp::any)> f;
-    moodycamel::ConcurrentQueue< cpp::any > queue;
-    std::mutex lock;
-    Mew* context;
-    std::atomic<int> jobCpt;
-} SubscriptionReference;
-std::map< std::string, std::vector< SubscriptionReference* > > _subscriptions;
-std::mutex _subRegistryMtx;
-void processSubscriber( SubscriptionReference* sref )
-{
-    cpp::any aobj;
-    if( sref->queue.try_dequeue( aobj ) )
-    {
-        cerr << "." << endl;
-        sref->f( aobj );
-    }
-}
-//
+    // PUB/SUB
+    std::map< std::string, std::vector< SubscriptionReference* > > _subscriptions;
+    std::mutex _subRegistryMtx;
+    void processSubscriber( SubscriptionReference* sref );
 
 protected:
 
 };
 
-mew::Mew* mew_init( int argc, char** argv )
-{
-    return new mew::Mew();
-}
+mew::Mew* mew_init( int argc, char** argv );
 
 }
 

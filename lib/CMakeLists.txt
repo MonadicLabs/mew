@@ -16,6 +16,14 @@ else()
     message(STATUS "The compiler ${CMAKE_CXX_COMPILER} has no C++11 support. Please use a different C++ compiler.")
 endif()
 
+# Logging
+if( USE_LOGGER )
+INCLUDE_DIRECTORIES( ${LIBMEW_SOURCE_DIR}/extdeps/loguru )
+add_definitions( -DUSE_LOGGING )
+set( MEW_DEPS "${MEW_DEPS};dl;pthread" )
+set( LOGURU_CPP "${LIBMEW_SOURCE_DIR}/extdeps/loguru/loguru.cpp" )
+endif()
+
 # Add Dynamic Library Loader dependency, pthread, uuid (if UNIX-based)
 set( MEW_DEPS "${MEW_DEPS}" )
 
@@ -25,22 +33,22 @@ include_directories( ${LIBMEW_SOURCE_DIR}/include )
 # Global source fetching
 file ( GLOB_RECURSE LIBMEW_CPP ./src/*.c* )
 
+# Remotery
+
 # SET SOURCES
-set( LIBMEW_ALL_CPP ${LIBMEW_CPP} )
+set( LIBMEW_ALL_CPP ${LIBMEW_CPP} ${LOGURU_CPP} )
 
 IF( LIBMEW_ALL_CPP )
 message( "LIBMEW_ALL_CPP=${LIBMEW_ALL_CPP}" )
 if( BUILD_STATIC_LIB )
-    add_library( mew STATIC ${NOVALINK_ALL_CPP} )
+    add_library( mew STATIC ${LIBMEW_ALL_CPP} )
 else()
-    add_library( mew SHARED ${NOVALINK_ALL_CPP} )
+    add_library( mew SHARED ${LIBMEW_ALL_CPP} )
 endif()
 
 # Link libraries
-target_link_libraries( novalink ${LIBMEW_DEPS} )
-
+target_link_libraries( mew ${LIBMEW_DEPS} )
 INSTALL( TARGETS mew DESTINATION "lib" )
-
 endif()
 
 # Install targets
