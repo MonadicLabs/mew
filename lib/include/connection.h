@@ -11,19 +11,20 @@ namespace mew
         Connection( Port* a, Port* b )
             :_a(a), _b(b)
         {
-            _a->connectTo( _b );
-            _b->connectFrom( _a );
+            _topic = _b->connectReceivingEnd( _a );
+            _a->connectEmittingEnd( _b );
         }
 
         virtual ~Connection()
         {
-            _a->disconnectTo( _b );
-            _b->disconnectFrom( _a );
+            _a->disconnectEmittingEnd( _b );
+            _b->disconnectReceivingEnd( _a );
         }
 
     private:
         Port * _a;
         Port * _b;
+        std::string _topic;
 
     protected:
 

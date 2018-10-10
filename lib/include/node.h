@@ -11,7 +11,7 @@ namespace mew
 {
     class Graph;
     class WorkSpace;
-    class Node : public LongIdentifiable, public Parameterizable
+    class Node : public EntityIdentifiable, public Parameterizable
     {
 
     public:
@@ -67,7 +67,7 @@ namespace mew
 
         virtual void onInput( const std::string& portName, cpp17::any& v )
         {
-
+            cerr << "default onInput()" << endl;
         }
         //
 

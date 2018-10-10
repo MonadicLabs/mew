@@ -1,6 +1,7 @@
 #pragma once
 
 #include "wsserver.h"
+#include "workspace.h"
 
 #include <map>
 #include <vector>
@@ -11,6 +12,7 @@ namespace mew
     {
     public:
         Server()
+            :_workspace(nullptr)
         {
 
         }
@@ -20,7 +22,18 @@ namespace mew
 
         }
 
+        void createNewWorkspace()
+        {
+            _workspace = new WorkSpace();
+        }
+
+        WorkSpace * workspace()
+        {
+            return _workspace;
+        }
+
     private:
+        WorkSpace* _workspace;
 
     protected:
 

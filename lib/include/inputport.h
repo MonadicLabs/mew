@@ -19,9 +19,8 @@ public:
 
     }
 
-    virtual void connectFrom( Port* p )
+    virtual std::string connectReceivingEnd( Port* otherEnd )
     {
-        cerr << "connect from " << p << endl;
         if( _subCtx != 0 )
         {
             // unsubscribe first ?
@@ -30,13 +29,13 @@ public:
         {
             WorkSpace* ws = _parent->context();
             std::function<void(mew::Mew*,cpp17::any)> f = [this](mew::Mew*, cpp17::any v){
-                cerr << "LDFKDLKGLDFKGLDGKDLKFGDLKG" << endl;
                 _parent->onInput( _label, v );
             };
-            std::string portPath = _parent->getInputPortFullPath( _label );
-            cerr << "inputPort path=" << portPath << endl;
-            _subCtx = ws->getRuntime()->subscribe( portPath, f );
+            _topic = _parent->getInputPortFullPath( _label );
+            cerr << "inputPort path=" << _topic << endl;
+            _subCtx = ws->getRuntime()->subscribe( _topic, f );
         }
+        return _topic;
     }
 
     virtual void disconnectFrom( Port* p )
@@ -54,15 +53,16 @@ public:
         return _queue.try_enqueue(v);
     }
 
-    virtual std::string getPubAddress()
+    virtual std::string pub_address()
     {
-        return _parent->getInputPortFullPath( _label );
+        return _topic;
     }
 
     void* _subCtx;
 
 protected:
     moodycamel::ConcurrentQueue<cpp17::any> _queue;
+    std::string _topic;
 
 };
 }

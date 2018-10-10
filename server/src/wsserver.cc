@@ -8,6 +8,9 @@ typedef ws_server::message_ptr message_ptr;
 
 // CRAFTERS
 #include "wshello_resp.h"
+#include "wslistgraph_resp.h"
+#include "wscreategraph_resp.h"
+#include "wsgraphdescription_resp.h"
 //
 
 #include <iostream>
@@ -94,4 +97,7 @@ bool mew::WebSocketServer::addResponseCrafter(string reqType, std::shared_ptr<me
 void mew::WebSocketServer::init()
 {
     _reqproc.addResponseCrafter( "hello", std::make_shared< HelloResponse >() );
+    _reqproc.addResponseCrafter( "listgraph", std::make_shared< ListGraphResponse >() );
+    _reqproc.addResponseCrafter( "creategraph", std::make_shared< CreateGraphResponse >() );
+    _reqproc.addResponseCrafter( "graphdesc", std::make_shared< GraphDescriptionResponse >() );
 }

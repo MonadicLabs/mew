@@ -42,6 +42,7 @@ file ( GLOB_RECURSE MEWD_CORE_CPP ./src/*.c* )
 file ( GLOB_RECURSE MEWD_CORE_HEADERS ./include/*.h* )
 set( MEWD_CPP ${MEWD_CORE_CPP} ${MEWD_CORE_HEADERS} ${JSON11_SRC} )
 
+set( DEPS "${DEPS};mew" )
 set( DEPS "${DEPS}" )
 
 add_executable( mewd ${MEWD_CPP} )

@@ -22,16 +22,11 @@ public:
 
     }
 
-    virtual void connectTo( Port* p )
+    virtual void connectEmittingEnd( Port* otherEnd )
     {
-        cerr << "connect to " << p << endl;
-        _pub = p->getPubAddress();
+        cerr << "connect to " << otherEnd << endl;
+        _pub = otherEnd->pub_address();
         cerr << "got pub addr=" << _pub << endl;
-    }
-
-    virtual void disconnectTo( Port* p )
-    {
-        cerr << "disconnect to " << p << endl;
     }
 
     virtual bool write(cpp17::any v)

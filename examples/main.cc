@@ -31,8 +31,9 @@ using namespace std;
 #include <sys/socket.h>
 #include <unistd.h>
 #include <cstring>
-
 //
+
+#include <cppbackports/any.h>
 
 void burn_cpu( int iter = 1e7 )
 {
@@ -135,7 +136,7 @@ public:
         declare_input( "in0" );
         declare_output( "out0" );
         declare_parameter( "width", Value::NUMBER, 800 );
-        setTickInterval( 1 );
+        setTickInterval( 0.0005 );
     }
 
     virtual ~TestNode()
@@ -152,6 +153,15 @@ public:
     virtual void onInput( const std::string& portName, cpp17::any& v )
     {
         cerr << this->str_id() << " received data on port " << portName << endl;
+        std::string content;
+        try{
+            content = cpp::any_cast<std::string>( v );
+            cerr << "CONTENT=" << content << endl;
+        }
+        catch ( cpp::bad_any_cast& e )
+        {
+            cerr << "BAD template<typename R, typename ...Args>" << endl;
+        }
     }
 };
 

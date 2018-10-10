@@ -36,6 +36,22 @@ namespace mew
 
         std::string toString();
 
+        bool setPayload( const std::string jsonPayload )
+        {
+            return false;
+        }
+
+        bool setPayload( json11::Json::object payload )
+        {
+            _payload = payload;
+            return true;
+        }
+
+        Json::object getPayload()
+        {
+            return _payload;
+        }
+
     private:
         std::string _type;
         uint16_t _versionMajor;

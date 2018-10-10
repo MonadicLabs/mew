@@ -1,7 +1,5 @@
 #pragma once
 
-#include <cuckoohash_map.hh>
-
 #include "workspace.h"
 #include "node.h"
 #include "connection.h"
@@ -26,7 +24,7 @@ namespace mew
         {
             n->_parent = this;
             EntityIdentifiable::ValueType nid = _context->assignId( n );
-            _nodes.insert( nid, n );
+            _nodes.insert( make_pair( nid, n ) );
             return nid;
         }
 
@@ -51,8 +49,28 @@ namespace mew
             return ret;
         }
 
+        std::vector< Node* > nodes()
+        {
+            std::vector< Node* > ret;
+            for( auto kv : _nodes )
+            {
+                ret.push_back( kv.second );
+            }
+            return ret;
+        }
+
+        std::vector< Connection* > connections()
+        {
+            std::vector< Connection* > ret;
+            for( auto kv : _connections )
+            {
+                ret.push_back( kv.second );
+            }
+            return ret;
+        }
+
     private:
-        cuckoohash_map< EntityIdentifiable::ValueType, Node* >         _nodes;
+        std::map< EntityIdentifiable::ValueType, Node* >         _nodes;
         std::map< EntityIdentifiable::ValueType, Connection* >   _connections;
 
     protected:

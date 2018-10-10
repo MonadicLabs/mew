@@ -179,3 +179,18 @@ mew::Mew *mew::mew_init(int argc, char **argv)
 {
     return new mew::Mew();
 }
+
+#include <cxxabi.h>
+const char *demangle(const char *name)
+{
+    static char buf[1024];
+    size_t size = sizeof(buf);
+    int status;
+    // todo:
+    char* res = abi::__cxa_demangle (name,
+                                     buf,
+                                     &size,
+                                     &status);
+    buf[sizeof(buf) - 1] = 0; // I'd hope __cxa_demangle does this when the name is huge, but just in case.
+    return res;
+}

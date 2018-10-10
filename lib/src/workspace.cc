@@ -7,6 +7,7 @@ using namespace std;
 #include "graph.h"
 #include "identifiable.h"
 #include "log.h"
+#include "proquint.h"
 
 mew::Graph *mew::WorkSpace::createEmptyGraph()
 {
@@ -42,6 +43,22 @@ mew::EntityIdentifiable::ValueType mew::WorkSpace::registerId(mew::EntityIdentif
 {
     _idDictionary.insert( 0 );
     return id;
+}
+
+mew::Graph *mew::WorkSpace::getGraph(const string &str_id)
+{
+    uint32_t id = quint2uint( str_id.c_str() );
+    return getGraph( id );
+}
+
+mew::Graph *mew::WorkSpace::getGraph(uint32_t id)
+{
+    Graph* ret = nullptr;
+    if( _graphs.find( id ) != _graphs.end() )
+    {
+        ret = _graphs[ id ];
+    }
+    return ret;
 }
 
 void mew::WorkSpace::init()

@@ -39,6 +39,19 @@ public:
         return _runtime->run();
     }
 
+    std::vector< mew::Graph* > listGraphs()
+    {
+        std::vector< mew::Graph* > ret;
+        for( auto& kv : _graphs )
+        {
+            ret.push_back( kv.second );
+        }
+        return ret;
+    }
+
+    Graph* getGraph( const std::string& str_id );
+    Graph* getGraph( uint32_t id );
+
 private:
     //
     void init();

@@ -15,6 +15,9 @@
 
 #include <unistd.h>
 
+#include <cxxabi.h>
+const char* demangle(const char* name);
+
 namespace mew
 {
 
@@ -135,19 +138,32 @@ public:
         sref->expected_type = typeid(Arg).hash_code();
         sref->context = this;
         sref->jobCpt = 0;
-        sref->f = [f, this](cpp::any aobj){
-            Arg couille0;
-            try{
-                couille0 = cpp::any_cast<Arg>( aobj );
-            }
-            catch ( cpp::bad_any_cast& e )
-            {
-                //                cerr << "bad_any_cast" << endl;
-                //                cerr << e.what() << endl;
-                return;
-            }
-            f(this, couille0);
-        };
+
+        if( typeid(Arg).hash_code() == typeid(cpp17::any).hash_code() )
+        {
+            sref->f = [f, this](cpp::any aobj){
+                f(this, aobj);
+            };
+        }
+        else
+        {
+            sref->f = [f, this](cpp::any aobj){
+                cerr << "received type: " << demangle(aobj.type().name()) << endl;
+                Arg couille0;
+                try{
+                    couille0 = cpp::any_cast<Arg>( aobj );
+                }
+                catch ( cpp::bad_any_cast& e )
+                {
+                    cerr << "BAD template<typename R, typename ...Args>" << endl;
+                    cerr << "BAD tyepid=" << demangle( typeid(Arg).name() ) << endl;
+                    cerr << "bad_any_cast " << endl;
+                    cerr << e.what() << endl;
+                    return;
+                }
+                f(this, couille0);
+            };
+        }
 
         if( _subscriptions.find( topic ) == _subscriptions.end() )
         {

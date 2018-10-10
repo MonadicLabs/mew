@@ -24,7 +24,9 @@
   function onOpen(evt)
   {
     writeToScreen("CONNECTED");
-    doSend("{ \"type\":\"hello\", \"version\":\"1.0\" }");
+    doSend("{ \"type\":\"listgraph\", \"version\":\"1.0\" }");
+	doSend("{ \"type\":\"graphdesc\", \"version\":\"1.0\" }");
+	doSend("{ \"type\":\"listgraph\", \"version\":\"1.0\" }");
   }
 
   function onClose(evt)

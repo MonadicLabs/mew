@@ -28,17 +28,25 @@ public:
 
     }
 
-    virtual void connectTo( Port* p )
-    {}
+    virtual void connectEmittingEnd( Port* otherEnd )
+    {
 
-    virtual void connectFrom( Port* p )
-    {}
+    }
 
-    virtual void disconnectTo( Port* p )
-    {}
+    virtual std::string connectReceivingEnd( Port* otherEnd )
+    {
+        return "";
+    }
 
-    virtual void disconnectFrom( Port* p )
-    {}
+    virtual void disconnectEmittingEnd( Port* otherEnd )
+    {
+
+    }
+
+    virtual void disconnectReceivingEnd( Port* otherEnd )
+    {
+
+    }
 
     virtual bool write( cpp17::any v )
     {
@@ -50,7 +58,7 @@ public:
         return false;
     }
 
-    virtual std::string getPubAddress()
+    virtual std::string pub_address()
     {
         return "";
     }

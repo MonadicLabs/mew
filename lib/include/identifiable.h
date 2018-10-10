@@ -7,51 +7,44 @@
 
 namespace mew
 {
-    template<typename T>
-    class Identifiable
+
+class EntityIdentifiable
+{
+public:
+    typedef uint32_t ValueType;
+    EntityIdentifiable( const uint32_t& id_value = 0 )
     {
-    public:
-        typedef T ValueType;
-        Identifiable( const T& id_value = 0 )
-        {
 
-        }
+    }
 
-        virtual ~Identifiable()
-        {
+    virtual ~EntityIdentifiable()
+    {
 
-        }
+    }
 
-        T id()
-        {
-            return _id;
-        }
+    uint32_t id()
+    {
+        return _id;
+    }
 
-        void set_id( T id_value )
-        {
-            _id = id_value;
-        }
+    void set_id( uint32_t id_value )
+    {
+        _id = id_value;
+    }
 
-        std::string str_id()
-        {
-            char tmpBuffer[1024];
-            uint2quint( tmpBuffer, id(), '-' );
-            tmpBuffer[11] = '\0';
-            std::string ret = tmpBuffer;
-            return ret;
-        }
+    std::string str_id();
 
-    private:
+private:
 
-    protected:
-        T _id;
+protected:
+    uint32_t _id;
 
-    };
+};
 
-    typedef Identifiable<uint16_t> ShortIdentifiable;
-    typedef Identifiable<uint32_t> LongIdentifiable;
+//typedef Identifiable<uint16_t> ShortIdentifiable;
+//typedef Identifiable<uint32_t> LongIdentifiable;
 
-    //
-    typedef LongIdentifiable EntityIdentifiable;
+//
+//typedef LongIdentifiable EntityIdentifiable;
 
 }
