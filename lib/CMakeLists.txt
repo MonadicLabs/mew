@@ -33,10 +33,15 @@ include_directories( ${LIBMEW_SOURCE_DIR}/include )
 # Global source fetching
 file ( GLOB_RECURSE LIBMEW_CPP ./src/*.c* )
 
+# Nodes source fetching
+file(GLOB_RECURSE NODES_SRC ${PROJECT_SOURCE_DIR}/nodes/*.c*)
+file(GLOB_RECURSE NODES_HEADERS ${PROJECT_SOURCE_DIR}/nodes/*.h)
+INCLUDE_DIRECTORIES( ${PROJECT_SOURCE_DIR}/nodes/ )
+
 # Remotery
 
 # SET SOURCES
-set( LIBMEW_ALL_CPP ${LIBMEW_CPP} ${LOGURU_CPP} )
+set( LIBMEW_ALL_CPP ${LIBMEW_CPP} ${LOGURU_CPP} ${NODES_SRC} )
 
 IF( LIBMEW_ALL_CPP )
 message( "LIBMEW_ALL_CPP=${LIBMEW_ALL_CPP}" )

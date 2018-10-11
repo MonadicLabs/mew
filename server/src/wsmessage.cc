@@ -29,12 +29,18 @@ std::shared_ptr<mew::Message> mew::Message::fromPayload(const std::string &paylo
         ret->_versionMinor = 0;
     }
 
+    if( json[ "payload" ].is_object() )
+    {
+        ret->_payload = json[ "payload" ].object_items();
+    }
+
     return ret;
 }
 
 std::shared_ptr<mew::Message> mew::Message::craftErrorMessage(int errorCode, const string &description)
 {
     std::shared_ptr<Message> ret = std::make_shared<mew::Message>();
+    ret->type() = "errror";
     ret->_payload = Json::object {
         { "description", description },
         { "code", errorCode }

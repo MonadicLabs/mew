@@ -26,7 +26,7 @@
     writeToScreen("CONNECTED");
     doSend("{ \"type\":\"listgraph\", \"version\":\"1.0\" }");
 	doSend("{ \"type\":\"graphdesc\", \"version\":\"1.0\" }");
-	doSend("{ \"type\":\"listgraph\", \"version\":\"1.0\" }");
+	doSend("{ \"type\":\"createnode\", \"version\":\"1.0\", \"payload\":{ \"graph\":\"bizim-bomif\", \"node_type\":\"Clock\" } }");
   }
 
   function onClose(evt)

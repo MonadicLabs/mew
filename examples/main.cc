@@ -136,7 +136,7 @@ public:
         declare_input( "in0" );
         declare_output( "out0" );
         declare_parameter( "width", Value::NUMBER, 800 );
-        setTickInterval( 0.0005 );
+        // setTickInterval( 1 );
     }
 
     virtual ~TestNode()
@@ -150,13 +150,13 @@ public:
         out("out0")->write( std::string("popo") );
     }
 
-    virtual void onInput( const std::string& portName, cpp17::any& v )
+    virtual void onInput( const std::string& portName, cpp::any& v )
     {
         cerr << this->str_id() << " received data on port " << portName << endl;
-        std::string content;
+        Value content;
         try{
-            content = cpp::any_cast<std::string>( v );
-            cerr << "CONTENT=" << content << endl;
+            content = cpp::any_cast<Value>( v );
+            cerr << "CONTENT=" << content.str() << endl;
         }
         catch ( cpp::bad_any_cast& e )
         {
@@ -169,14 +169,27 @@ int main( int argc, char** argv )
 {
     mew::WorkSpace * ws = new mew::WorkSpace();
     mew::Graph * g = ws->createEmptyGraph();
-    TestNode * tn = new TestNode( ws, 0 );
-    TestNode * tn2 = new TestNode( ws, 0 );
+    mew::Node * tn = mew::Node::create("UDPSrc");
+    tn->setContext( ws );
+    mew::Node * tn2 = mew::Node::create("Console");
+    tn2->setContext( ws );
     g->addNode( tn );
     g->addNode( tn2 );
     cerr << "tn id=" << tn->str_id() << endl;
     cerr << "tn2 id=" << tn2->str_id() << endl;
-    g->addConnection( tn->out("out0"), tn2->in("in0") );
+    g->addConnection( tn->out("out"), tn2->in("in") );
     cerr << "this is a test" << endl;
+
+    std::thread popo([&](){
+        while(true)
+        {
+            // cerr << ".";
+            sleep(2);
+            tn->setParameter("rate", (double)rand() / (double)(RAND_MAX) / 10.0 );
+            sleep(1);
+        }
+    });
+
     ws->run();
 
     /*

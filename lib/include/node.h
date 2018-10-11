@@ -3,19 +3,23 @@
 #include "port.h"
 #include "identifiable.h"
 #include "parameterizable.h"
+#include "abstractregister.h"
 
 #include <iostream>
 using namespace std;
 
 namespace mew
 {
+    class Node;
+    typedef AbstractFactory<Node> NodeFactory;
+
     class Graph;
     class WorkSpace;
     class Node : public EntityIdentifiable, public Parameterizable
     {
 
     public:
-        Node( WorkSpace* ctx, Graph* parent = nullptr )
+        Node( WorkSpace* ctx = nullptr, Graph* parent = nullptr )
             :_context(ctx), _parent(parent), _tickTimerRef(0), _tickInterval(0.0)
         {
 
@@ -23,20 +27,7 @@ namespace mew
 
         virtual ~Node()
         {
-            /*
-            cerr << "NODE_DTOR()" << endl;
-            for( auto kv : _inputPorts )
-            {
-                InputPort * ip = (InputPort*)kv.second;
-                if( _context->unsubscribe( ip->_subCtx ) )
-                {
-                    cerr << "Unsubscribed !!!!" << endl;
-                }
-                delete kv.second;
-            }
-            _inputPorts.clear();
-            _context->printSubscriptions();
-            */
+
         }
 
         virtual void tick( double dt )
@@ -76,6 +67,22 @@ namespace mew
             return _context;
         }
 
+        void setContext( WorkSpace* ctx )
+        {
+            _context = ctx;
+            onContextChange( _context );
+        }
+
+        void setParent( Graph* parent )
+        {
+            _parent = parent;
+        }
+
+        // Node registration
+        static void registerNode( const std::string& nodeType, std::shared_ptr<NodeFactory> factory );
+        static Node* create( const std::string& nodeType );
+        //
+
     protected:
         mew::WorkSpace * _context;
 
@@ -97,11 +104,11 @@ namespace mew
             onInput( inputPortName, value );
         }
 
-        virtual bool declare_parameter( const std::string &paramName, Value::Type type, Value defaultValue )
+        virtual bool declare_parameter( const std::string &paramName, Value::Type type, Value defaultValue );
+
+        virtual void onContextChange( WorkSpace* ctx )
         {
-            // Add a port for this
-            // _inputPorts.insert( std::make_pair( paramName, new ParameterPort( this ) ) );
-            Parameterizable::declare_parameter( paramName, type, defaultValue );
+
         }
 
     public:
@@ -142,5 +149,24 @@ namespace mew
         // hierarchy
         Graph* _parent;
 
+    private:
+        // Node registrar
+        static AbstractRegister<Node>& _nodeRegistrar();
+        //
+
     };
 }
+
+#define REGISTER_NODE(klass) \
+    class klass##Factory : public mew::NodeFactory { \
+    public: \
+    klass##Factory() \
+    { \
+    std::shared_ptr<klass##Factory> myself(this); \
+    mew::Node::registerNode(#klass, myself); \
+    } \
+    virtual mew::Node* create() { \
+    return new mew::klass(); \
+    } \
+    }; \
+    static klass##Factory global_##klass##Factory;

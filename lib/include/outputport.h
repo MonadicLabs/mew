@@ -34,7 +34,7 @@ public:
         if( _pub.size() )
         {
             WorkSpace * ws = _parent->context();
-            cerr << "_pub=" << _pub << endl;
+            // cerr << "_pub=" << _pub << endl;
             ws->getRuntime()->publish( _pub, v );
         }
     }

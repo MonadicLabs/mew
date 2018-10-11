@@ -7,6 +7,7 @@ option(BUILD_TESTS "Build Tests" OFF)
 option(BUILD_DAEMON "Build mew dameon" ON )
 option(BUILD_STATIC_LIB "Build static library" ON)
 option(USE_LOGGER "Use logging capabilities" OFF)
+option(BUILD_GUI "Build mewd GUI" ON)
 
 add_subdirectory(lib)
 
@@ -20,4 +21,8 @@ endif( BUILD_TESTS )
 
 if( BUILD_DAEMON )
     add_subdirectory( server )
+endif()
+
+if( BUILD_GUI )
+	add_subdirectory( client )
 endif()

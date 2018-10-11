@@ -3,7 +3,10 @@ using namespace std;
 
 #include "mewserver.h"
 #include "wsserver.h"
+#include "graph.h"
+
 using namespace mew;
+
 
 int main( int argc, char** argv )
 {
@@ -14,10 +17,11 @@ int main( int argc, char** argv )
     //
     // TEST
     //
-    server.workspace()->createEmptyGraph();
+    mew::Graph * g = server.workspace()->createEmptyGraph();
+    g->addNode( Node::create("Clock") );
 
     WebSocketServer wss(&server);
-    wss.start();
+    // wss.start();
 
 	return 0;
 }

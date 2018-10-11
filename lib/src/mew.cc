@@ -122,7 +122,7 @@ void mew::Mew::processIO()
             _callbacks.insert( make_pair( ioref->fd, ioref ) );
         }
     }
-    int ret = ::poll(&pfds[0], pfds.size(), 1.0 );
+    int ret = ::poll(&pfds[0], pfds.size(), _minTimerInterval * 1000.0 );
     if(ret < 0){
         // TODO
         // throw std::runtime_error(std::string("poll: ") + std::strerror(errno));

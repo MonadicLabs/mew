@@ -57,7 +57,7 @@ public:
         _minTimerInterval = 1.0;
         int numAdditionnalThreads = std::thread::hardware_concurrency() - 1;
         // cerr << "Number of additionnal threads = " << numAdditionnalThreads << endl;
-        // numAdditionnalThreads = 3;
+//        numAdditionnalThreads = 0;
         _scheduler = std::make_shared<mew::JobScheduler>( numAdditionnalThreads );
     }
 
@@ -128,7 +128,7 @@ public:
         return subscribe( topic, f );
     }
 
-    template<typename R, typename Arg>
+    template<typename R, typename Arg, typename std::enable_if<!std::is_same<Arg, cpp::any>::value, Arg>::type* = nullptr>
     void * subscribe( const std::string& topic, std::function<R(Mew*, Arg)> f )
     {
         std::unique_lock< std::mutex >( _subRegistryMtx );
@@ -139,13 +139,6 @@ public:
         sref->context = this;
         sref->jobCpt = 0;
 
-        if( typeid(Arg).hash_code() == typeid(cpp17::any).hash_code() )
-        {
-            sref->f = [f, this](cpp::any aobj){
-                f(this, aobj);
-            };
-        }
-        else
         {
             sref->f = [f, this](cpp::any aobj){
                 cerr << "received type: " << demangle(aobj.type().name()) << endl;
@@ -180,12 +173,42 @@ public:
 
     }
 
+    template<typename R, typename Arg, typename std::enable_if<std::is_same<Arg, cpp::any>::value, Arg>::type* = nullptr>
+    void * subscribe( const std::string& topic, std::function<R(Mew*, Arg)> f )
+    {
+        std::unique_lock< std::mutex >( _subRegistryMtx );
+        cerr << "template<typename R, typename ...Args>" << endl;
+        cerr << "tyepid=" << typeid(cpp::any).name() << endl;
+        SubscriptionReference* sref = new SubscriptionReference();
+        sref->expected_type = typeid(cpp::any).hash_code();
+        sref->context = this;
+        sref->jobCpt = 0;
+
+        sref->f = [f, this](cpp::any aobj){
+            f(this, aobj);
+        };
+
+        if( _subscriptions.find( topic ) == _subscriptions.end() )
+        {
+            std::vector< SubscriptionReference* > srefs;
+            _subscriptions.insert( std::make_pair(topic, srefs) );
+        }
+
+        {
+            auto& sl = _subscriptions[ topic ];
+            sl.push_back( sref );
+        }
+
+        return (void*)sref;
+
+    }
+
     bool unsubscribe( void* subReference );
 
     template<typename T>
     void publish( const std::string& topic, T&& obj )
     {
-        cerr << "**** TOPIC=" << topic << endl;
+        // cerr << "**** TOPIC=" << topic << endl;
         std::unique_lock< std::mutex >( _subRegistryMtx );
         // Look for subscriber
         if( _subscriptions.find( topic ) != _subscriptions.end() )

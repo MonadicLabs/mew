@@ -10,6 +10,8 @@ using namespace std;
 #include <cppbackports/any.h>
 using namespace cpp17;
 
+#include "string.h"
+
 class Value
 {
 public:
@@ -190,6 +192,13 @@ public:
         }
 
         return ret;
+    }
+
+    void setBinary( void* b, size_t bsize )
+    {
+        _type = BINARY;
+        _binaryValue.resize( bsize );
+        memcpy( &_binaryValue[0], b, bsize );
     }
 
 private:
