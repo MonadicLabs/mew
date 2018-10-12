@@ -57,8 +57,12 @@ public:
         _minTimerInterval = 1.0;
         int numAdditionnalThreads = std::thread::hardware_concurrency() - 1;
         // cerr << "Number of additionnal threads = " << numAdditionnalThreads << endl;
-//        numAdditionnalThreads = 0;
+        numAdditionnalThreads = 0;
         _scheduler = std::make_shared<mew::JobScheduler>( numAdditionnalThreads );
+        if( numAdditionnalThreads == 0 )
+        {
+            _minTimerInterval = 0.001;
+        }
     }
 
     virtual ~Mew()
@@ -107,7 +111,7 @@ public:
     }
 
     template<typename R, typename Arg>
-    void  * io( std::function<R(Mew*, Arg)> f, int filedescriptor )
+    void * io( std::function<R(Mew*, Arg)> f, int filedescriptor )
     {
         Job * ioJob = createIOCheckJob();
         _scheduler->push( ioJob );
@@ -222,7 +226,7 @@ public:
                 Job * j = new Job( []( Job* j ){
                         SubscriptionReference * sref = (SubscriptionReference*)(j->userData());
                         cpp::any pol;
-                        if( sref->queue.try_dequeue( pol ) )
+                        while( sref->queue.try_dequeue( pol ) )
                 {
                         sref->f( pol );
             }

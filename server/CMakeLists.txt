@@ -28,14 +28,14 @@ INCLUDE_DIRECTORIES( ./include )
 # INCLUDE_DIRECTORIES( ${NOVALINK_SOURCE_DIR}/extdeps/json11/ )
 
 # websocketpp
-INCLUDE_DIRECTORIES( ${MEWD_SOURCE_DIR}/extdeps/websocketpp/ )
+INCLUDE_DIRECTORIES( ${MEW_SOURCE_DIR}/extdeps/websocketpp/ )
 
 # asio
-INCLUDE_DIRECTORIES( ${MEWD_SOURCE_DIR}/extdeps/asio/include )
+INCLUDE_DIRECTORIES( ${MEW_SOURCE_DIR}/extdeps/asio/asio/include )
 
 # JSON11
-file( GLOB JSON11_SRC ${MEWD_SOURCE_DIR}/extdeps/json11/json11.cpp )
-INCLUDE_DIRECTORIES( ${MEWD_SOURCE_DIR}/extdeps/json11/ )
+file( GLOB JSON11_SRC ${MEW_SOURCE_DIR}/extdeps/json11/json11.cpp )
+INCLUDE_DIRECTORIES( ${MEW_SOURCE_DIR}/extdeps/json11/ )
 
 # Global source fetching
 file ( GLOB_RECURSE MEWD_CORE_CPP ./src/*.c* )

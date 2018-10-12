@@ -24,14 +24,14 @@ include_directories(${LIBMEW_SOURCE_DIR}/include)
 include_directories(${PROJECT_SOURCE_DIR})
 
 # websocketpp
-INCLUDE_DIRECTORIES( ${MEWD_SOURCE_DIR}/extdeps/websocketpp/ )
+INCLUDE_DIRECTORIES( ${MEW_SOURCE_DIR}/extdeps/websocketpp/ )
 
 # asio
-INCLUDE_DIRECTORIES( ${MEWD_SOURCE_DIR}/extdeps/asio/include )
+INCLUDE_DIRECTORIES( ${MEW_SOURCE_DIR}/extdeps/asio/asio/include )
 
 # JSON11
-file( GLOB JSON11_SRC ${MEWD_SOURCE_DIR}/extdeps/json11/json11.cpp )
-INCLUDE_DIRECTORIES( ${MEWD_SOURCE_DIR}/extdeps/json11/ )
+file( GLOB JSON11_SRC ${MEW_SOURCE_DIR}/extdeps/json11/json11.cpp )
+INCLUDE_DIRECTORIES( ${MEW_SOURCE_DIR}/extdeps/json11/ )
 
 add_definitions( -DASIO_HEADER_ONLY )
 

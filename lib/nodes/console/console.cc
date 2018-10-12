@@ -20,11 +20,11 @@ void mew::Console::onInput(const string &portName, any &v)
         if( content.is(Value::BINARY) )
         {
 //            content.
-            print_bytes( cerr, "[console]", &content.binary()[0], content.binary().size() );
+            // print_bytes( cerr, "[console]", &content.binary()[0], content.binary().size() );
         }
         else
         {
-            cerr << "[console] " << content.str() << endl;
+            // cerr << "[console] " << content.str() << endl;
         }
     }
     catch ( cpp::bad_any_cast& e )

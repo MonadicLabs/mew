@@ -170,8 +170,11 @@ int main( int argc, char** argv )
     mew::WorkSpace * ws = new mew::WorkSpace();
     mew::Graph * g = ws->createEmptyGraph();
     mew::Node * tn = mew::Node::create("UDPSrc");
+    tn->setParameter( "port", 9940 );
     tn->setContext( ws );
-    mew::Node * tn2 = mew::Node::create("Console");
+    mew::Node * tn2 = mew::Node::create("UDPSink");
+    tn2->setParameter("host", "127.0.0.1");
+    tn2->setParameter("port", 5000);
     tn2->setContext( ws );
     g->addNode( tn );
     g->addNode( tn2 );
@@ -181,11 +184,20 @@ int main( int argc, char** argv )
     cerr << "this is a test" << endl;
 
     std::thread popo([&](){
+        int i = 0;
         while(true)
         {
             // cerr << ".";
             sleep(2);
-            tn->setParameter("rate", (double)rand() / (double)(RAND_MAX) / 10.0 );
+            if( i%2 == 0 )
+            {
+                tn->setParameter("port", 9940);
+            }
+            else
+            {
+                tn->setParameter("port", 9941);
+            }
+            i++;
             sleep(1);
         }
     });

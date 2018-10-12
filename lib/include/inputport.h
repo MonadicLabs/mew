@@ -8,7 +8,7 @@ namespace mew
 class InputPort : public Port
 {
 public:
-    InputPort( Node* parent, size_t queueSize )
+    InputPort( Node* parent, size_t queueSize = 1024 )
         :Port(parent), _subCtx(0)
     {
 

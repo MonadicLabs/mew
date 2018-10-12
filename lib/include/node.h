@@ -95,7 +95,7 @@ namespace mew
         // Ports
         std::map< std::string, Port* > _inputPorts;
         std::map< std::string, Port* > _outputPorts;
-        void declare_input(const std::string& portName, int queueSize = 10 );
+        void declare_input(const std::string& portName, int queueSize = 1024 );
 
         void declare_output( const std::string& portName );
 

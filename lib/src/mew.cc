@@ -117,6 +117,7 @@ void mew::Mew::processIO()
     std::map< int, IOReference* > _callbacks;
     for( IOReference* ioref : _ioRefs )
     {
+        if( ioref->processed == 0 )
         {
             pfds.push_back({ ioref->fd, POLLIN, 0} );
             _callbacks.insert( make_pair( ioref->fd, ioref ) );
@@ -142,7 +143,10 @@ void mew::Mew::processIO()
 #ifdef MEW_USE_PROFILING
                 rmt_BeginCPUSample( IO_CALLBACK, 0);
 #endif
+
+                _callbacks[ p.fd ]->processed = 1;
                 _callbacks[ p.fd ]->f( _callbacks[ p.fd ]->context, p.fd );
+                _callbacks[ p.fd ]->processed = 0;
 
 #ifdef MEW_USE_PROFILING
                 rmt_EndCPUSample();
