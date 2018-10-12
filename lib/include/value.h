@@ -201,6 +201,67 @@ public:
         memcpy( &_binaryValue[0], b, bsize );
     }
 
+    size_t size()
+    {
+        size_t ret = 0;
+        switch( _type )
+        {
+            case NONE:
+        {
+            ret = 0;
+            break;
+        }
+
+        case STRING:
+        {
+            ret = _stringValue.size();
+            break;
+        }
+
+        case NUMBER:
+        {
+            ret = sizeof(_numberValue);
+            break;
+        }
+
+        case BINARY:
+        {
+            ret = _binaryValue.size();
+            break;
+        }
+
+        case BOOLEAN:
+        {
+            ret = 1;
+            break;
+        }
+
+        case ARRAY:
+        {
+            for( Value& v : _arrayValue )
+            {
+                ret += v.size();
+            }
+            break;
+        }
+
+        case OBJECT:
+        {
+            for( auto& kv : _objectValue )
+            {
+                ret += kv.second.size();
+            }
+            break;
+        }
+
+        default:
+            break;
+
+        }
+
+        return ret;
+    }
+
 private:
     Type _type;
     std::string _stringValue;
