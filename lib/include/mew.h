@@ -51,6 +51,16 @@ class Mew
         std::atomic<int> jobCpt;
     } SubscriptionReference;
 
+    typedef struct
+    {
+        SubscriptionReference* sub_backend;
+        Mew* context;
+        moodycamel::ConcurrentQueue< cpp::any > queue;
+        std::function<void(cpp::any)> f;
+        std::function<void(mew::Mew*,void*)> fc;
+        std::string sub_topic;
+    } ChannelReference;
+
 public:
     Mew()
     {
@@ -187,7 +197,6 @@ public:
         sref->expected_type = typeid(cpp::any).hash_code();
         sref->context = this;
         sref->jobCpt = 0;
-
         sref->f = [f, this](cpp::any aobj){
             f(this, aobj);
         };
@@ -227,11 +236,11 @@ public:
                         SubscriptionReference * sref = (SubscriptionReference*)(j->userData());
                         cpp::any pol;
                         while( sref->queue.try_dequeue( pol ) )
-                {
-                        sref->f( pol );
-            }
+                        {
+                            sref->f( pol );
+                        }
                         sref->jobCpt--;
-            }, sref);
+                }, sref);
                 j->label() = "JOB_SUB_TICK";
                 _scheduler->push( j );
             }
@@ -243,6 +252,74 @@ public:
     }
 
     void printSubscriptions();
+
+    // Channels
+    template<typename R, typename Arg>
+    void * channel_open( const std::string& topic, R(*fptr)(Mew*, Arg) )
+    {
+        std::function<R(Mew*, Arg)> f = static_cast<std::function<R(Mew*, Arg)> >(fptr);
+        return channel_open( topic, f );
+    }
+
+    template<typename R, typename Arg>
+    void * channel_open( const std::string& channel_name, std::function<R(Mew*, Arg)> f )
+    {
+        ChannelReference * cref = new ChannelReference;
+        cref->f = [f, this](cpp::any aobj){
+            cerr << "CHANNEL received type: " << demangle(aobj.type().name()) << endl;
+            Arg couille0;
+            try{
+                couille0 = cpp::any_cast<Arg>( aobj );
+            }
+            catch ( cpp::bad_any_cast& e )
+            {
+                cerr << "BAD template<typename R, typename ...Args>" << endl;
+                cerr << "BAD tyepid=" << demangle( typeid(Arg).name() ) << endl;
+                cerr << "bad_any_cast " << endl;
+                cerr << e.what() << endl;
+                return;
+            }
+            f(this, couille0);
+        };
+
+        // Create a subscription topic for the receiving end...
+        cref->fc = [cref](mew::Mew* m, void* nope){
+            cpp::any aa;
+            if( cref->queue.try_dequeue(aa) )
+            {
+                cref->f( aa );
+            }
+        };
+        cref->sub_topic = channel_name + "";
+        cref->sub_backend = subscribe( cref->sub_topic, cref->fc );
+        _channels.insert( make_pair( channel_name, cref ) );
+        //
+
+        return cref;
+    }
+
+    template<typename T>
+    void channel_write( const std::string& channel_name, T&& obj )
+    {
+        // Try to find channel definition
+        ChannelReference * cref = nullptr;
+        if( _channels.find( channel_name ) != _channels.end() )
+        {
+            cref = _channels[ channel_name ];
+        }
+
+        if( cref )
+        {
+            cpp::any pany = obj;
+            if( cref->queue.try_enqueue( pany ) )
+            {
+                this->publish( cref->sub_topic, (void*)(0) );
+            }
+        }
+
+    }
+    //
+
     void set_timer_interval( void* timer_ref, double dt_secs );
 
 private:
@@ -267,6 +344,9 @@ private:
     std::map< std::string, std::vector< SubscriptionReference* > > _subscriptions;
     std::mutex _subRegistryMtx;
     void processSubscriber( SubscriptionReference* sref );
+
+    // CHANNELS
+    std::map< std::string, ChannelReference* > _channels;
 
 protected:
 

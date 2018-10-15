@@ -167,6 +167,21 @@ public:
 
 int main( int argc, char** argv )
 {
+    mew::Mew * m = new mew::Mew();
+    m->channel_open( "chan0", sub1 );
+
+    std::thread popo([&](){
+    int cpt = 0;
+    while(true)
+    {
+        m->channel_write( "chan0", (double)cpt++ );
+        usleep(100);
+    }
+    });
+
+    m->run();
+
+    /*
     mew::WorkSpace * ws = new mew::WorkSpace();
     mew::Graph * g = ws->createEmptyGraph();
     mew::Node * tn = mew::Node::create("UDPSrc");
@@ -201,8 +216,8 @@ int main( int argc, char** argv )
             sleep(1);
         }
     });
-
     ws->run();
+    */
 
     /*
     std::deque< cpp::any > anyqueue;
