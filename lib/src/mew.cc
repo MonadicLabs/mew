@@ -93,22 +93,22 @@ mew::Job *mew::Mew::createTimerCheckJob()
     {
             tref->processed = 1;
             mew::Job * trigJob = new Job( []( mew::Job* j ) {
-                TimerReference * tr = (TimerReference*)j->userData();
-                tr->f( tr->context, tr->t.elapsed() );
-                tr->t.reset();
-                tr->processed = 0;
-            }, tref );
-            trigJob->label() = "TIMER_CALLBACK";
-            j->pushChild( trigJob );
-    }
+            TimerReference * tr = (TimerReference*)j->userData();
+            tr->f( tr->context, tr->t.elapsed() );
+            tr->t.reset();
+            tr->processed = 0;
+}, tref );
+    trigJob->label() = "TIMER_CALLBACK";
+    j->pushChild( trigJob );
+}
 
-    usleep( (int)((m->_minTimerInterval / 10.0) * 1000000.0) );
+usleep( (int)((m->_minTimerInterval / 10.0) * 1000000.0) );
 
-    // Should be half the smallest timer tick value
-    j->pushChild( m->createTimerCheckJob() );
-    }, this );
-    timerJob->label() = "TIMER_CHECK";
-    return timerJob;
+// Should be half the smallest timer tick value
+j->pushChild( m->createTimerCheckJob() );
+}, this );
+timerJob->label() = "TIMER_CHECK";
+return timerJob;
 }
 
 void mew::Mew::processIO()
@@ -117,21 +117,22 @@ void mew::Mew::processIO()
     std::map< int, IOReference* > _callbacks;
     for( IOReference* ioref : _ioRefs )
     {
-        if( ioref->processed == 0 )
+        // if( ioref->processed == 0 )
         {
             pfds.push_back({ ioref->fd, POLLIN, 0} );
             _callbacks.insert( make_pair( ioref->fd, ioref ) );
         }
     }
-    int ret = ::poll(&pfds[0], pfds.size(), _minTimerInterval * 1000.0 );
+//    cerr << "pfds.size=" << pfds.size() << endl;
+    int ret = ::poll(&pfds[0], pfds.size(), 0 );
     if(ret < 0){
         // TODO
         // throw std::runtime_error(std::string("poll: ") + std::strerror(errno));
-        //        cerr << "poll ERRROR!" << endl;
+        cerr << "poll ERRROR!" << endl;
     }
     else if( ret == 0 )
     {
-        //                    cerr << "timeout !" << endl;
+        // cerr << "timeout !" << endl;
     }
     else
     {
@@ -140,17 +141,27 @@ void mew::Mew::processIO()
             if(p.revents == POLLIN)
             {
                 p.revents = 0;
-#ifdef MEW_USE_PROFILING
-                rmt_BeginCPUSample( IO_CALLBACK, 0);
-#endif
+
+                //#ifdef MEW_USE_PROFILING
+                //                rmt_BeginCPUSample( IO_CALLBACK, 0);
+                //#endif
 
                 _callbacks[ p.fd ]->processed = 1;
                 _callbacks[ p.fd ]->f( _callbacks[ p.fd ]->context, p.fd );
                 _callbacks[ p.fd ]->processed = 0;
 
-#ifdef MEW_USE_PROFILING
-                rmt_EndCPUSample();
-#endif
+//                _callbacks[ p.fd ]->processed = 1;
+//                mew::Job * ioJob = new Job( []( mew::Job* j ) {
+//                        IOReference * ioref = (IOReference*)j->userData();
+//                        ioref->f( ioref->context, ioref->fd );
+//                        ioref->processed = 0;
+//                }, _callbacks[ p.fd ] );
+//                ioJob->label() = "IO_PROCESS";
+//                _scheduler->push( ioJob );
+
+                //#ifdef MEW_USE_PROFILING
+                //                rmt_EndCPUSample();
+                //#endif
             }
         }
     }
@@ -160,11 +171,11 @@ mew::Job *mew::Mew::createIOCheckJob()
 {
     Job * ioJob = new Job( []( Job* j ){
             mew::Mew * m = (mew::Mew*)j->userData();
-            // j->pushChild( m->createIOCheckJob() );
             // cerr << "dlkfjdlkfjdfklj" << endl;
             m->processIO();
+            usleep(1000);
             j->pushChild( m->createIOCheckJob() );
-}, this );
+    }, this );
     ioJob->label() = "IO_CHECK";
     return ioJob;
 }

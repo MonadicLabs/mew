@@ -9,6 +9,7 @@
 #include <cppbackports/any.h>
 
 #include "blockingconcurrentqueue.h"
+#include "channelqueue.h"
 #include "jobworker.h"
 #include "timer.h"
 #include "safe_ptr.h"
@@ -43,6 +44,11 @@ class Mew
 
     typedef struct
     {
+        IOReference * ioref;
+    } IOTickInstance;
+
+    typedef struct
+    {
         size_t expected_type;
         std::function<void(cpp::any)> f;
         moodycamel::ConcurrentQueue< cpp::any > queue;
@@ -53,9 +59,16 @@ class Mew
 
     typedef struct
     {
-        SubscriptionReference* sub_backend;
+        SubscriptionReference * sref;
+        cpp::any item;
+    } SubscriptionPublication;
+
+    typedef struct
+    {
+        void* sub_backend;
         Mew* context;
-        moodycamel::ConcurrentQueue< cpp::any > queue;
+        // moodycamel::BlockingConcurrentQueue< cpp::any > queue;
+        ChannelQueue< cpp::any > queue;
         std::function<void(cpp::any)> f;
         std::function<void(mew::Mew*,void*)> fc;
         std::string sub_topic;
@@ -67,7 +80,7 @@ public:
         _minTimerInterval = 1.0;
         int numAdditionnalThreads = std::thread::hardware_concurrency() - 1;
         // cerr << "Number of additionnal threads = " << numAdditionnalThreads << endl;
-        numAdditionnalThreads = 0;
+        // numAdditionnalThreads = 0;
         _scheduler = std::make_shared<mew::JobScheduler>( numAdditionnalThreads );
         if( numAdditionnalThreads == 0 )
         {
@@ -125,7 +138,7 @@ public:
     {
         Job * ioJob = createIOCheckJob();
         _scheduler->push( ioJob );
-        cerr << "io std::function" << endl;
+        cerr << "io std::function FD=" << filedescriptor << endl;
         IOReference * ioref = new IOReference();
         ioref->fd = filedescriptor;
         ioref->f = f;
@@ -146,8 +159,8 @@ public:
     void * subscribe( const std::string& topic, std::function<R(Mew*, Arg)> f )
     {
         std::unique_lock< std::mutex >( _subRegistryMtx );
-        cerr << "template<typename R, typename ...Args>" << endl;
-        cerr << "tyepid=" << typeid(Arg).name() << endl;
+        cerr << "SUB template<typename R, typename ...Args>" << endl;
+        cerr << "SUB tyepid=" << typeid(Arg).name() << endl;
         SubscriptionReference* sref = new SubscriptionReference();
         sref->expected_type = typeid(Arg).hash_code();
         sref->context = this;
@@ -155,16 +168,16 @@ public:
 
         {
             sref->f = [f, this](cpp::any aobj){
-                cerr << "received type: " << demangle(aobj.type().name()) << endl;
+//                cerr << "SUB received type: " << demangle(aobj.type().name()) << endl;
                 Arg couille0;
                 try{
                     couille0 = cpp::any_cast<Arg>( aobj );
                 }
                 catch ( cpp::bad_any_cast& e )
                 {
-                    cerr << "BAD template<typename R, typename ...Args>" << endl;
-                    cerr << "BAD tyepid=" << demangle( typeid(Arg).name() ) << endl;
-                    cerr << "bad_any_cast " << endl;
+                    cerr << "SUB BAD template<typename R, typename ...Args>" << endl;
+                    cerr << "SUB BAD tyepid=" << demangle( typeid(Arg).name() ) << endl;
+                    cerr << "SUB bad_any_cast " << endl;
                     cerr << e.what() << endl;
                     return;
                 }
@@ -197,6 +210,7 @@ public:
         sref->expected_type = typeid(cpp::any).hash_code();
         sref->context = this;
         sref->jobCpt = 0;
+
         sref->f = [f, this](cpp::any aobj){
             f(this, aobj);
         };
@@ -230,19 +244,26 @@ public:
             for( SubscriptionReference* sref : sl )
             {
                 cpp::any aobj = obj;
-                sref->queue.enqueue( aobj );
                 sref->jobCpt++;
+                SubscriptionPublication * subpub = new SubscriptionPublication();
+                subpub->sref = sref;
+                subpub->item = aobj;
                 Job * j = new Job( []( Job* j ){
-                        SubscriptionReference * sref = (SubscriptionReference*)(j->userData());
-                        cpp::any pol;
-                        while( sref->queue.try_dequeue( pol ) )
-                        {
-                            sref->f( pol );
-                        }
-                        sref->jobCpt--;
-                }, sref);
-                j->label() = "JOB_SUB_TICK";
+                        SubscriptionPublication * spub = (SubscriptionPublication*)(j->userData());
+                        spub->sref->f( spub->item );
+                        spub->sref->jobCpt--;
+                        delete spub;
+                }, subpub);
+                j->label() = "JOB_PUBLICATION";
                 _scheduler->push( j );
+
+                /*
+                cpp::any aobj = obj;
+                {
+                    sref->f( aobj );
+                }
+                */
+
             }
         }
         else
@@ -261,7 +282,7 @@ public:
         return channel_open( topic, f );
     }
 
-    template<typename R, typename Arg>
+    template<typename R, typename Arg, typename std::enable_if<!std::is_same<Arg, cpp::any>::value, Arg>::type* = nullptr>
     void * channel_open( const std::string& channel_name, std::function<R(Mew*, Arg)> f )
     {
         ChannelReference * cref = new ChannelReference;
@@ -273,25 +294,65 @@ public:
             }
             catch ( cpp::bad_any_cast& e )
             {
-                cerr << "BAD template<typename R, typename ...Args>" << endl;
-                cerr << "BAD tyepid=" << demangle( typeid(Arg).name() ) << endl;
-                cerr << "bad_any_cast " << endl;
+                cerr << "CHANNEL BAD template<typename R, typename ...Args>" << endl;
+                cerr << "CHANNEL BAD tyepid=" << demangle( typeid(Arg).name() ) << endl;
+                cerr << "CHANNEL bad_any_cast " << endl;
                 cerr << e.what() << endl;
                 return;
             }
+//            cerr << "will call f_channel" << endl;
             f(this, couille0);
+//            cerr << "called f_channel" << endl;
         };
 
         // Create a subscription topic for the receiving end...
         cref->fc = [cref](mew::Mew* m, void* nope){
             cpp::any aa;
-            if( cref->queue.try_dequeue(aa) )
+            if( cref->queue.pop(aa) )
             {
+//                cerr << "call_0" << endl;
                 cref->f( aa );
+                cerr << "call_1" << endl;
+            }
+            else
+            {
+                cerr << "rate." << endl;
             }
         };
         cref->sub_topic = channel_name + "";
-        cref->sub_backend = subscribe( cref->sub_topic, cref->fc );
+        cref->sub_backend = (void*)(subscribe( cref->sub_topic, cref->fc ));
+        _channels.insert( make_pair( channel_name, cref ) );
+        //
+
+        return cref;
+    }
+
+    template<typename R, typename Arg, typename std::enable_if<std::is_same<Arg, cpp::any>::value, Arg>::type* = nullptr>
+    void * channel_open( const std::string& channel_name, std::function<R(Mew*, Arg)> f )
+    {
+        ChannelReference * cref = new ChannelReference;
+
+        cref->f = [f, this](cpp::any aobj){
+            // cerr << "any direct" << endl;
+            f(this, aobj);
+        };
+
+        // Create a subscription topic for the receiving end...
+        cref->fc = [cref](mew::Mew* m, void* nope){
+            cpp::any aa;
+            if( cref->queue.pop(aa) )
+            {
+                // cerr << "call_0" << endl;
+                cref->f( aa );
+//                cerr << "call_1" << endl;
+            }
+            else
+            {
+                cerr << "encore rate." << endl;
+            }
+        };
+        cref->sub_topic = channel_name + "";
+        cref->sub_backend = (void*)(subscribe( cref->sub_topic, cref->fc ));
         _channels.insert( make_pair( channel_name, cref ) );
         //
 
@@ -307,14 +368,26 @@ public:
         {
             cref = _channels[ channel_name ];
         }
+        else
+        {
+            cerr << "uh nope." << endl;
+        }
 
         if( cref )
         {
             cpp::any pany = obj;
-            if( cref->queue.try_enqueue( pany ) )
+            if( cref->queue.push( pany ) )
             {
                 this->publish( cref->sub_topic, (void*)(0) );
             }
+            else
+            {
+                cerr << "CHANNEL " << cref->sub_topic << " could not enqueue !" << endl;
+            }
+        }
+        else
+        {
+            cerr << "lol nope. " << channel_name << endl;
         }
 
     }

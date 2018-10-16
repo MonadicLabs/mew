@@ -5,6 +5,7 @@
 mew::Clock::Clock(WorkSpace *ctx)
     :Node(ctx)
 {
+    _cpt = 0;
     declare_output( "out" );
     declare_parameter( "rate", Value::NUMBER, 1.0 );
 }
@@ -21,7 +22,8 @@ void mew::Clock::onContextChange(mew::WorkSpace *ctx)
 
 void mew::Clock::onTimer(double dt)
 {
-    out("out")->write( Value(dt) );
+//    cerr << "coucou" << endl;
+    out("out")->write( Value(_cpt++) );
 }
 
 void mew::Clock::onSetParameter(const string &paramName, Value value)

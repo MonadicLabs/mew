@@ -15,6 +15,7 @@ public:
 private:
     void init_udp_socket();
     int _fd;
+    int setNonBlocking( int fd );
 
 protected:
 

@@ -2,6 +2,7 @@
 #include "udpsrc.h"
 #include "workspace.h"
 
+#include <fcntl.h>
 #include <arpa/inet.h>
 #include <netinet/in.h>
 #include <stdio.h>
@@ -29,12 +30,22 @@ void mew::UDPSrc::onContextChange(mew::WorkSpace *ctx)
     std::function<void(mew::Mew*,int)> f = [this](mew::Mew*, int fd){
         char buf[1024];
         // cerr << "fd=" << fd << endl;
-//        cerr << "[[ READ." << endl;
-        int cc = read( fd, buf, 1024 );
-        // cerr << "cc=" << cc << " buf=" << buf << endl;
-        Value ret(cc);
-        ret.setBinary( buf, cc );
-        this->out("out")->write( ret );
+        while(true)
+        {
+            int cc = read( fd, buf, 1024 );
+            //cerr << "cc=" << cc << endl;
+            if( cc <= 0 )
+            {
+                break;
+            }
+            else
+            {
+                // cerr << "cc=" << cc << " buf=" << buf << endl;
+                Value ret(cc);
+                ret.setBinary( buf, cc );
+                this->out("out")->write( ret );
+            }
+        }
     };
     void * popo = m->io( f, _fd );
 }
@@ -64,6 +75,8 @@ void mew::UDPSrc::init_udp_socket()
         //diep("socket");
         cerr << ":( socket." << endl;
 
+    setNonBlocking( _fd );
+
     memset((char *) &si_me, 0, sizeof(si_me));
     si_me.sin_family = AF_INET;
     uint16_t bindPort = (uint16_t)(getParameter("port").number());
@@ -76,6 +89,23 @@ void mew::UDPSrc::init_udp_socket()
     if (::bind(_fd, (const sockaddr*)(&si_me), sizeof(si_me))==-1)
         cerr << ":( bind" << endl;
 
+}
+
+int mew::UDPSrc::setNonBlocking(int fd)
+{
+    int flags;
+
+    /* If they have O_NONBLOCK, use the Posix way to do it */
+#if defined(O_NONBLOCK)
+    /* Fixme: O_NONBLOCK is defined but broken on SunOS 4.1.x and AIX 3.2.5. */
+    if (-1 == (flags = fcntl(fd, F_GETFL, 0)))
+        flags = 0;
+    return fcntl(fd, F_SETFL, flags | O_NONBLOCK);
+#else
+    /* Otherwise, use the old way of doing it */
+    flags = 1;
+    return ioctl(fd, FIOBIO, &flags);
+#endif
 }
 
 

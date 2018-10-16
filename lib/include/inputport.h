@@ -33,7 +33,7 @@ public:
             };
             _topic = _parent->getInputPortFullPath( _label );
             cerr << "inputPort path=" << _topic << endl;
-            _subCtx = ws->getRuntime()->subscribe( _topic, f );
+            _subCtx = ws->getRuntime()->channel_open( _topic, f );
         }
         return _topic;
     }

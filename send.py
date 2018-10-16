@@ -17,10 +17,10 @@ sock = socket.socket(socket.AF_INET, # Internet
 i=0  
 while True:
     curMessage = MESSAGE
-    curMessage = curMessage + chr(i) + chr(i) + chr(i) + chr(i) + chr(i) + chr(i) + chr(i) + chr(i) + chr(i) + chr(i) + chr(i) + chr(i) + chr(i) + chr(i) + chr(i) + chr(i) + chr(i) + chr(i) + chr(i) + chr(i) + chr(i) + chr(i) + chr(i) + chr(i) + chr(i) + chr(i) + chr(i) + chr(i) + chr(i) + chr(i) + chr(i) + chr(i) + chr(i) + chr(i) + chr(i) + chr(i) + chr(i) + chr(i) + chr(i) + chr(i) + chr(i) + chr(i) + chr(i) + chr(i) + chr(i) + chr(i) + chr(i) + chr(i) + chr(i) + chr(i) + chr(i) + chr(i) + chr(i) + chr(i) + chr(i) + chr(i) + chr(i) + chr(i) + chr(i) + chr(i) + chr(i) + chr(i) + chr(i) + chr(i) + chr(i) + chr(i) + chr(i) + chr(i) + chr(i) + chr(i) + chr(i) + chr(i) + chr(i) + chr(i) + chr(i) + chr(i) + chr(i) + chr(i) + chr(i) + chr(i) + chr(i) + chr(i) + chr(i) + chr(i) + chr(i) + chr(i) + chr(i) + chr(i) + chr(i) + chr(i) + chr(i)
+    curMessage = curMessage + chr(i) + chr(i) + chr(i)
     print(i)
     sock.sendto(curMessage, (UDP_IP, UDP_PORT))
     i=i+1
     if i > 255:
         i=0
-    usleep(100)
+    usleep(1000)

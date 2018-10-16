@@ -82,7 +82,7 @@ public:
     {
         if( requiredAdditionnalThreads == 0 )
         {
-            _singleThreadQueue = new FIFOQueue< Job* >();
+            // _singleThreadQueue = new FIFOQueue< Job* >();
             cerr << "Using single thread mode !" << endl;
         }
         else

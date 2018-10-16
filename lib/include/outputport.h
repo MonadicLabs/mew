@@ -35,7 +35,7 @@ public:
         {
             WorkSpace * ws = _parent->context();
             // cerr << "_pub=" << _pub << endl;
-            ws->getRuntime()->publish( _pub, v );
+            ws->getRuntime()->channel_write( _pub, v );
         }
     }
 

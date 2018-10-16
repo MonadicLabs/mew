@@ -16,6 +16,7 @@ public:
     virtual void onSetParameter(const string &paramName, Value value);
 
 private:
+    int _cpt;
 
 protected:
 
