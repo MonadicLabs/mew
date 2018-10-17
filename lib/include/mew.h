@@ -13,11 +13,15 @@
 #include "jobworker.h"
 #include "timer.h"
 #include "safe_ptr.h"
+#include "selectio.h"
+#include "uvtimer.h"
 
 #include <unistd.h>
 
 #include <cxxabi.h>
 const char* demangle(const char* name);
+
+#include <uv.h>
 
 namespace mew
 {
@@ -77,12 +81,25 @@ class Mew
 public:
     Mew()
     {
-        _minTimerInterval = 1.0;
-        int numAdditionnalThreads = std::thread::hardware_concurrency() - 1;
-        // cerr << "Number of additionnal threads = " << numAdditionnalThreads << endl;
-        // numAdditionnalThreads = 0;
-        _scheduler = std::make_shared<mew::JobScheduler>( numAdditionnalThreads );
-        if( numAdditionnalThreads == 0 )
+
+        // UV - experimental
+        uv_loop_init( &_loop );
+
+        _pollScheduled.store(0);
+        _poller = new SelectIO();
+        _ioThread = std::thread([&]{
+            while(true)
+            {
+                this->processIO();
+            }
+        });
+
+        _minTimerInterval = 0.001;
+        _numAdditional = std::thread::hardware_concurrency() - 1;
+        // cerr << "Number of additionnal threads = " << _numAdditional << endl;
+         _numAdditional = 0;
+        _scheduler = std::make_shared<mew::JobScheduler>( _numAdditional );
+        if( _numAdditional == 0 )
         {
             _minTimerInterval = 0.001;
         }
@@ -95,10 +112,11 @@ public:
 
     void run()
     {
-        Job * timerJob = createTimerCheckJob();
+        Job * timerJob = createUVLoopJob();
         _scheduler->push( timerJob );
         return _scheduler->run();
     }
+
 
     template<typename R, typename Arg>
     void * timer( R (*fptr)(Mew*, Arg), double dt_usec )
@@ -112,6 +130,10 @@ public:
     void * timer( std::function<R(Mew*, Arg)> f, double dt_sec )
     {
         cerr << "timer std::function" << endl;
+        UVTimer * uvt = new UVTimer( &_loop, this, f, dt_sec );
+        _uvtimers.push_back( uvt );
+
+        /*
         TimerReference* tref = new TimerReference();
         tref->dt_sec = dt_sec;
         tref->approach = std::numeric_limits<double>::max();
@@ -123,6 +145,9 @@ public:
         if( tref->dt_sec < _minTimerInterval )
             _minTimerInterval = tref->dt_sec;
         return (void*)tref;
+        */
+
+
     }
 
     template<typename R, typename Arg>
@@ -136,8 +161,8 @@ public:
     template<typename R, typename Arg>
     void * io( std::function<R(Mew*, Arg)> f, int filedescriptor )
     {
-        Job * ioJob = createIOCheckJob();
-        _scheduler->push( ioJob );
+        // Job * ioJob = createIOCheckJob();
+        // _scheduler->push( ioJob );
         cerr << "io std::function FD=" << filedescriptor << endl;
         IOReference * ioref = new IOReference();
         ioref->fd = filedescriptor;
@@ -145,6 +170,7 @@ public:
         ioref->processed = 0;
         ioref->context = this;
         _ioRefs.push_back( ioref );
+        _poller->add( filedescriptor );
         return (void*)ioref;
     }
 
@@ -395,9 +421,22 @@ public:
 
     void set_timer_interval( void* timer_ref, double dt_secs );
 
+    std::shared_ptr< JobScheduler > scheduler()
+    {
+        return _scheduler;
+    }
+
 private:
     // Job Scheduler
     std::shared_ptr< JobScheduler > _scheduler;
+    int _numAdditional;
+
+    // UV - experimental
+    uv_loop_t _loop;
+    Job *createUVLoopJob();
+
+    // UV - timers
+    std::vector< UVTimer* > _uvtimers;
 
     // Timer
     std::mutex _timerLock;
@@ -407,6 +446,9 @@ private:
     double _minTimerInterval;
 
     // IO
+    std::thread _ioThread;
+    std::atomic<int> _pollScheduled;
+    IOPoller * _poller;
     std::mutex _ioLock;
     std::vector< IOReference* > _ioRefs;
     double _ioTimeoutSecs;

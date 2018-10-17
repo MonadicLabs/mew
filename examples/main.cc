@@ -1,5 +1,6 @@
 
 #include <iostream>
+#include <iomanip>
 #include <thread>
 #include <sstream>
 using namespace std;
@@ -99,12 +100,8 @@ void sub2( mew::Mew* ctx, std::string msg )
 int cpt=0;
 void timer_func1( mew::Mew* ctx, double dt_usec )
 {
-    cerr << "timer_func1 dt=" << dt_usec << endl;
-    //    usleep(100000);
-    // burn_cpu(1e3);
-    stringstream sstr;
-    sstr << "coucou_" << cpt++;
-    ctx->publish( "popo", sstr.str() );
+    cerr << "timer_func1 dt=" << std::setprecision(20) << dt_usec << endl;
+    burn_cpu(1e4);
 }
 
 void timer_func2( mew::Mew* ctx, double dt_usec )
@@ -167,10 +164,16 @@ public:
 
 int main( int argc, char** argv )
 {
-    /*
-    mew::Mew * m = new mew::Mew();
-    m->channel_open( "chan0", sub1 );
 
+    mew::Mew * m = new mew::Mew();
+//    m->timer( timer_func1, 0.1 );
+    m->timer( timer_func1, 0.001 );
+    m->timer( timer_func1, 0.001 );
+    m->timer( timer_func1, 0.001 );
+
+    //    m->channel_open( "chan0", sub1 );
+
+    /*
     std::thread popo([&](){
     int cpt = 0;
     while(true)
@@ -179,10 +182,11 @@ int main( int argc, char** argv )
         usleep(10);
     }
     });
-
-    m->run();
     */
 
+    m->run();
+
+    /*
     mew::WorkSpace * ws = new mew::WorkSpace();
     mew::Graph * g = ws->createEmptyGraph();
 
@@ -201,43 +205,23 @@ int main( int argc, char** argv )
     g->addConnection( tn->out("out"), tn2->in("in") );
     cerr << "this is a test" << endl;
 
-//    mew::Node * tn_ = mew::Node::create("UDPSrc");
-//    tn_->setParameter( "port", 9941 );
-//    tn_->setContext( ws );
-//    tn_->setParameter( "rate", 0.0001 );
-//    mew::Node * tn2_ = mew::Node::create("UDPSink");
-//        tn2_->setParameter("host", "127.0.0.1");
-//        tn2_->setParameter("port", 6000);
-//    tn2_->setContext( ws );
-//    g->addNode( tn_ );
-//    g->addNode( tn2_ );
-//    cerr << "tn id=" << tn_->str_id() << endl;
-//    cerr << "tn2 id=" << tn2_->str_id() << endl;
-//    g->addConnection( tn_->out("out"), tn2_->in("in") );
-//    cerr << "this is a test" << endl;
-
-    /*
-    std::thread popo([&](){
-        int i = 0;
-        while(true)
-        {
-            // cerr << ".";
-            sleep(2);
-            if( i%2 == 0 )
-            {
-                tn->setParameter("port", 9940);
-            }
-            else
-            {
-                tn->setParameter("port", 9941);
-            }
-            i++;
-            sleep(1);
-        }
-    });
-    */
+    mew::Node * tn_ = mew::Node::create("UDPSrc");
+    tn_->setParameter( "port", 9941 );
+    tn_->setContext( ws );
+    tn_->setParameter( "rate", 0.0001 );
+    mew::Node * tn2_ = mew::Node::create("UDPSink");
+        tn2_->setParameter("host", "127.0.0.1");
+        tn2_->setParameter("port", 6000);
+    tn2_->setContext( ws );
+    g->addNode( tn_ );
+    g->addNode( tn2_ );
+    cerr << "tn id=" << tn_->str_id() << endl;
+    cerr << "tn2 id=" << tn2_->str_id() << endl;
+    g->addConnection( tn_->out("out"), tn2_->in("in") );
+    cerr << "this is a test again" << endl;
 
     ws->run();
+    */
 
     /*
     std::deque< cpp::any > anyqueue;

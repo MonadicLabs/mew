@@ -7,3 +7,6 @@
 [submodule "extdeps/websocketpp"]
 	path = extdeps/websocketpp
 	url = https://github.com/zaphoyd/websocketpp.git
+[submodule "extdeps/libuv"]
+	path = extdeps/libuv
+	url = https://github.com/libuv/libuv.git

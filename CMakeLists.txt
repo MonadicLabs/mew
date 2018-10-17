@@ -5,10 +5,14 @@ project(MEW)
 option(BUILD_EXAMPLE_APPS "Build Example Applications" ON)
 option(BUILD_TESTS "Build Tests" OFF)
 option(BUILD_DAEMON "Build mew dameon" ON )
-option(BUILD_STATIC_LIB "Build static library" ON)
+option(BUILD_STATIC_LIB "Build static library" OFF)
 option(USE_LOGGER "Use logging capabilities" OFF)
 option(BUILD_GUI "Build mewd GUI" ON)
 
+# libuv
+add_subdirectory( ${MEW_SOURCE_DIR}/extdeps/libuv )
+
+#
 add_subdirectory(lib)
 
 if( BUILD_EXAMPLE_APPS )

@@ -41,7 +41,7 @@ INCLUDE_DIRECTORIES( ${PROJECT_SOURCE_DIR}/nodes/ )
 # Remotery
 
 # SET SOURCES
-set( LIBMEW_ALL_CPP ${LIBMEW_CPP} ${LOGURU_CPP} ${NODES_SRC} )
+set( LIBMEW_ALL_CPP ${LIBMEW_CPP} ${LOGURU_CPP} )
 
 IF( LIBMEW_ALL_CPP )
 message( "LIBMEW_ALL_CPP=${LIBMEW_ALL_CPP}" )
@@ -51,8 +51,15 @@ else()
     add_library( mew SHARED ${LIBMEW_ALL_CPP} )
 endif()
 
+# libuv
+add_dependencies( mew uv_a )
+set( MEW_DEPS "${MEW_DEPS};uv" )
+
+# fPIC
+# set_property(TARGET mew PROPERTY POSITION_INDEPENDENT_CODE OFF)
+
 # Link libraries
-target_link_libraries( mew ${LIBMEW_DEPS} )
+target_link_libraries( mew ${MEW_DEPS} )
 INSTALL( TARGETS mew DESTINATION "lib" )
 endif()
 

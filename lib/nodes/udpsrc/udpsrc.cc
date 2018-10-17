@@ -8,6 +8,14 @@
 #include <stdio.h>
 #include <sys/types.h>
 #include <sys/socket.h>
+#include <arpa/inet.h>
+#include <netinet/in.h>
+#include <stdio.h>
+#include <sys/types.h>
+#include <sys/socket.h>
+#include <unistd.h>
+#include <cstring>
+#include <netdb.h>
 #include <unistd.h>
 #include <cstring>
 
@@ -17,6 +25,31 @@ mew::UDPSrc::UDPSrc(WorkSpace *ctx)
     declare_output( "out" );
     declare_parameter( "port", Value::NUMBER, 9940 );
     _fd = -1;
+
+    // LOOPBACK TEST
+    struct sockaddr_in si_me, si_other;
+    int s, i, slen=sizeof(si_other);
+
+    if ((_lo=socket(AF_INET, SOCK_DGRAM, IPPROTO_UDP))==-1)
+        //diep("socket");
+        cerr << ":( socket." << endl;
+
+    struct hostent *server;
+
+    /* gethostbyname: get the server's DNS entry */
+    server = gethostbyname( "127.0.0.1" );
+    if (server == NULL) {
+        fprintf(stderr,"ERROR, no such host as %s\n", getParameter("host").string().c_str() );
+        exit(0);
+    }
+
+    /* build the server's Internet address */
+    bzero((char *) &serveraddr, sizeof(serveraddr));
+    serveraddr.sin_family = AF_INET;
+    bcopy((char *)server->h_addr,
+          (char *)&serveraddr.sin_addr.s_addr, server->h_length);
+    serveraddr.sin_port = htons( 5000 );
+    //
 }
 
 mew::UDPSrc::~UDPSrc()
@@ -28,11 +61,11 @@ void mew::UDPSrc::onContextChange(mew::WorkSpace *ctx)
 {
     mew::Mew * m = ctx->getRuntime();
     std::function<void(mew::Mew*,int)> f = [this](mew::Mew*, int fd){
-        char buf[1024];
-        // cerr << "fd=" << fd << endl;
+        char buf[4096];
         while(true)
         {
-            int cc = read( fd, buf, 1024 );
+            memset( buf, 0, 4096 );
+            int cc = read( fd, buf, 4096 );
             //cerr << "cc=" << cc << endl;
             if( cc <= 0 )
             {
@@ -44,6 +77,17 @@ void mew::UDPSrc::onContextChange(mew::WorkSpace *ctx)
                 Value ret(cc);
                 ret.setBinary( buf, cc );
                 this->out("out")->write( ret );
+
+                /*
+                // LOOPBACK TEST
+                cerr << "cc=" << cc << endl;
+                int serverlen = sizeof(serveraddr);
+                int n = sendto(_lo, buf, cc, 0, (const sockaddr*)(&serveraddr), serverlen);
+                if (n < 0)
+                  cerr << "ERROR in sendto" << endl;
+                //
+                */
+
             }
         }
     };

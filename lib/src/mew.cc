@@ -1,6 +1,8 @@
 
 #include "mew.h"
 
+#include "uvtimer.h"
+
 bool mew::Mew::unsubscribe(void *subReference)
 {
     std::unique_lock< std::mutex >( _subRegistryMtx );
@@ -68,6 +70,33 @@ void mew::Mew::set_timer_interval(void *timer_ref, double dt_secs)
     }
 }
 
+mew::Job *mew::Mew::createUVLoopJob()
+{
+
+    if( _numAdditional > 0 )
+    {
+        Job * uvJob = new Job( []( Job* j ){
+                mew::Mew * m = (mew::Mew*)j->userData();
+                uv_run( &(m->_loop), UV_RUN_ONCE);
+                Job * nextJob = m->createUVLoopJob();
+                j->pushChild( nextJob );
+        }, this );
+        uvJob->label() = "UV_UPDATE";
+        return uvJob;
+    }
+    else
+    {
+        Job * uvJob = new Job( []( Job* j ){
+                mew::Mew * m = (mew::Mew*)j->userData();
+                uv_run( &(m->_loop), UV_RUN_NOWAIT);
+                Job * nextJob = m->createUVLoopJob();
+                j->pushChild( nextJob );
+        }, this );
+        uvJob->label() = "UV_UPDATE";
+        return uvJob;
+    }
+}
+
 std::vector<mew::Mew::TimerReference *> mew::Mew::processTimers()
 {
     std::vector< TimerReference* > ret;
@@ -113,55 +142,26 @@ return timerJob;
 
 void mew::Mew::processIO()
 {
-    std::vector<struct pollfd> pfds;
-    std::map< int, IOReference* > _callbacks;
-    for( IOReference* ioref : _ioRefs )
+    std::vector< int > rfd = _poller->poll( 0.0 );
+    for( int fd : rfd )
     {
-        // if( ioref->processed == 0 )
+        for( IOReference* ioref : _ioRefs )
         {
-            pfds.push_back({ ioref->fd, POLLIN, 0} );
-            _callbacks.insert( make_pair( ioref->fd, ioref ) );
-        }
-    }
-//    cerr << "pfds.size=" << pfds.size() << endl;
-    int ret = ::poll(&pfds[0], pfds.size(), 0 );
-    if(ret < 0){
-        // TODO
-        // throw std::runtime_error(std::string("poll: ") + std::strerror(errno));
-        cerr << "poll ERRROR!" << endl;
-    }
-    else if( ret == 0 )
-    {
-        // cerr << "timeout !" << endl;
-    }
-    else
-    {
-        for( struct pollfd &p : pfds)
-        {
-            if(p.revents == POLLIN)
+            if( ioref->fd == fd )
             {
-                p.revents = 0;
+                ioref->processed = 1;
+                ioref->f( ioref->context, fd );
+                ioref->processed = 0;
 
-                //#ifdef MEW_USE_PROFILING
-                //                rmt_BeginCPUSample( IO_CALLBACK, 0);
-                //#endif
+                //                ioref->processed = 1;
+                //                mew::Job * ioJob = new Job( []( mew::Job* j ) {
+                //                        IOReference * ioref = (IOReference*)j->userData();
+                //                        ioref->f( ioref->context, ioref->fd );
+                //                        ioref->processed = 0;
+                //                }, ioref );
+                //                ioJob->label() = "IO_PROCESS";
+                //                _scheduler->push( ioJob );
 
-                _callbacks[ p.fd ]->processed = 1;
-                _callbacks[ p.fd ]->f( _callbacks[ p.fd ]->context, p.fd );
-                _callbacks[ p.fd ]->processed = 0;
-
-//                _callbacks[ p.fd ]->processed = 1;
-//                mew::Job * ioJob = new Job( []( mew::Job* j ) {
-//                        IOReference * ioref = (IOReference*)j->userData();
-//                        ioref->f( ioref->context, ioref->fd );
-//                        ioref->processed = 0;
-//                }, _callbacks[ p.fd ] );
-//                ioJob->label() = "IO_PROCESS";
-//                _scheduler->push( ioJob );
-
-                //#ifdef MEW_USE_PROFILING
-                //                rmt_EndCPUSample();
-                //#endif
             }
         }
     }
@@ -171,12 +171,15 @@ mew::Job *mew::Mew::createIOCheckJob()
 {
     Job * ioJob = new Job( []( Job* j ){
             mew::Mew * m = (mew::Mew*)j->userData();
-            // cerr << "dlkfjdlkfjdfklj" << endl;
             m->processIO();
-            usleep(1000);
+            m->_pollScheduled.store( m->_pollScheduled.load() - 1 );
+            if( m->_pollScheduled.load() <= 0 )
+    {
             j->pushChild( m->createIOCheckJob() );
-    }, this );
+}
+}, this );
     ioJob->label() = "IO_CHECK";
+    _pollScheduled.store( _pollScheduled.load() + 1 );
     return ioJob;
 }
 
