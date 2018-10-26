@@ -19,11 +19,13 @@ void mew::Node::registerNode(const string &nodeType, std::shared_ptr<mew::NodeFa
     _nodeRegistrar().registerFactory( nodeType, factory );
 }
 
+/*
 mew::Node *mew::Node::create(const string &nodeType)
 {
     cerr << "Attempting to create node of type: " << nodeType << endl;
     return _nodeRegistrar().create(nodeType);
 }
+*/
 
 void mew::Node::setTickInterval(double intervalSeconds)
 {

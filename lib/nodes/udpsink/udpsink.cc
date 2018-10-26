@@ -47,11 +47,17 @@ void mew::UDPSink::onInput(const string &portName, any &v)
         content = cpp::any_cast<Value>( v );
         if( content.is(Value::BINARY) )
         {
+#ifdef MEW_USE_PROFILING
+        rmt_BeginCPUSampleDynamic( "UDP_SEND", 0);
+#endif
             /* send the message to the server */
             int serverlen = sizeof(serveraddr);
             int n = sendto(_fd, &content.binary()[0], content.binary().size(), 0, (const sockaddr*)(&serveraddr), serverlen);
             if (n < 0)
               cerr << "ERROR in sendto" << endl;
+#ifdef MEW_USE_PROFILING
+        rmt_EndCPUSample();
+#endif
         }
     }
     catch ( cpp::bad_any_cast& e )

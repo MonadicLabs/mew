@@ -119,9 +119,9 @@ void io_test1( mew::Mew* ctx, int fd )
     int rr = read( fd, buf, 1024 );
     stringstream sstr;
     sstr << "read " << rr << " bytes " << " from fd=" << fd << endl;
-    ctx->publish( "popo", 12345.45 );
+    // ctx->publish( "popo", 12345.45 );
     // burn_cpu(1e6);
-    // cerr << sstr.str();
+    cerr << sstr.str();
 }
 
 class TestNode : public mew::Node
@@ -165,28 +165,40 @@ public:
 int main( int argc, char** argv )
 {
 
+    /*
     mew::Mew * m = new mew::Mew();
+
+    // UDP TEST
+#define BUFLEN 2048
+#define NPACK 10
+
+    struct sockaddr_in si_me, si_other;
+    int s, i, slen=sizeof(si_other);
+    char buf[BUFLEN];
+
+    if ((s=socket(AF_INET, SOCK_DGRAM, IPPROTO_UDP))==-1)
+        //diep("socket");
+        cerr << ":( socket." << endl;
+
+    memset((char *) &si_me, 0, sizeof(si_me));
+    si_me.sin_family = AF_INET;
+    si_me.sin_port = htons(9940);
+    si_me.sin_addr.s_addr = htonl(INADDR_ANY);
+    if (::bind(s, (const sockaddr*)(&si_me), sizeof(si_me))==-1)
+        cerr << ":( bind" << endl;
+    m->io( io_test1, s );
+    //
+
 //    m->timer( timer_func1, 0.1 );
-    m->timer( timer_func1, 0.001 );
-    m->timer( timer_func1, 0.001 );
-    m->timer( timer_func1, 0.001 );
+//    m->timer( timer_func1, 0.1 );
+//    m->timer( timer_func1, 0.001 );
+//    m->timer( timer_func1, 0.001 );
 
     //    m->channel_open( "chan0", sub1 );
 
-    /*
-    std::thread popo([&](){
-    int cpt = 0;
-    while(true)
-    {
-        m->channel_write( "chan0", (double)cpt++ );
-        usleep(10);
-    }
-    });
+    m->run();
     */
 
-    m->run();
-
-    /*
     mew::WorkSpace * ws = new mew::WorkSpace();
     mew::Graph * g = ws->createEmptyGraph();
 
@@ -205,11 +217,11 @@ int main( int argc, char** argv )
     g->addConnection( tn->out("out"), tn2->in("in") );
     cerr << "this is a test" << endl;
 
-    mew::Node * tn_ = mew::Node::create("UDPSrc");
+    mew::Node * tn_ = mew::Node::create("Clock");
     tn_->setParameter( "port", 9941 );
     tn_->setContext( ws );
-    tn_->setParameter( "rate", 0.0001 );
-    mew::Node * tn2_ = mew::Node::create("UDPSink");
+    tn_->setParameter( "rate", 0.001 );
+    mew::Node * tn2_ = mew::Node::create("Console");
         tn2_->setParameter("host", "127.0.0.1");
         tn2_->setParameter("port", 6000);
     tn2_->setContext( ws );
@@ -221,7 +233,6 @@ int main( int argc, char** argv )
     cerr << "this is a test again" << endl;
 
     ws->run();
-    */
 
     /*
     std::deque< cpp::any > anyqueue;

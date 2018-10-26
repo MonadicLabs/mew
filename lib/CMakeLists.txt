@@ -41,7 +41,7 @@ INCLUDE_DIRECTORIES( ${PROJECT_SOURCE_DIR}/nodes/ )
 # Remotery
 
 # SET SOURCES
-set( LIBMEW_ALL_CPP ${LIBMEW_CPP} ${LOGURU_CPP} )
+set( LIBMEW_ALL_CPP ${LIBMEW_CPP} ${NODES_SRC} ${LOGURU_CPP} )
 
 IF( LIBMEW_ALL_CPP )
 message( "LIBMEW_ALL_CPP=${LIBMEW_ALL_CPP}" )
@@ -53,7 +53,7 @@ endif()
 
 # libuv
 add_dependencies( mew uv_a )
-set( MEW_DEPS "${MEW_DEPS};uv" )
+set( MEW_DEPS "${MEW_DEPS};uv_a" )
 
 # fPIC
 # set_property(TARGET mew PROPERTY POSITION_INDEPENDENT_CODE OFF)

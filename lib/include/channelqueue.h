@@ -26,8 +26,8 @@ namespace mew
 
         bool pop( T& item )
         {
-            _impl.wait_dequeue( item );
-            return true;
+            return _impl.try_dequeue( item );
+//            return true;
         }
 
         bool steal( T& item)
@@ -41,7 +41,7 @@ namespace mew
         }
 
     private:
-        moodycamel::BlockingConcurrentQueue<T> _impl;
+        moodycamel::ConcurrentQueue<T> _impl;
 
     protected:
 

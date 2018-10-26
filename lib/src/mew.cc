@@ -88,7 +88,7 @@ mew::Job *mew::Mew::createUVLoopJob()
     {
         Job * uvJob = new Job( []( Job* j ){
                 mew::Mew * m = (mew::Mew*)j->userData();
-                uv_run( &(m->_loop), UV_RUN_NOWAIT);
+                uv_run( &(m->_loop), UV_RUN_ONCE);
                 Job * nextJob = m->createUVLoopJob();
                 j->pushChild( nextJob );
         }, this );

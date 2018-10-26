@@ -7,7 +7,7 @@ mew::Clock::Clock(WorkSpace *ctx)
 {
     _cpt = 0;
     declare_output( "out" );
-    declare_parameter( "rate", Value::NUMBER, 1.0 );
+    declare_parameter( "rate", Value::NUMBER, 0.01 );
 }
 
 mew::Clock::~Clock()

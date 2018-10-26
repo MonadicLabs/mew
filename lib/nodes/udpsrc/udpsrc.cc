@@ -62,14 +62,14 @@ void mew::UDPSrc::onContextChange(mew::WorkSpace *ctx)
     mew::Mew * m = ctx->getRuntime();
     std::function<void(mew::Mew*,int)> f = [this](mew::Mew*, int fd){
         char buf[4096];
-        while(true)
+        // while(true)
         {
             memset( buf, 0, 4096 );
             int cc = read( fd, buf, 4096 );
             //cerr << "cc=" << cc << endl;
             if( cc <= 0 )
             {
-                break;
+                // break;
             }
             else
             {

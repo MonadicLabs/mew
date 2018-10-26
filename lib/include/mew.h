@@ -15,6 +15,8 @@
 #include "safe_ptr.h"
 #include "selectio.h"
 #include "uvtimer.h"
+#include "uvpoller.h"
+#include "uvasync.h"
 
 #include <unistd.h>
 
@@ -69,12 +71,11 @@ class Mew
 
     typedef struct
     {
-        void* sub_backend;
+        UVAsync * async_ref;
         Mew* context;
-        // moodycamel::BlockingConcurrentQueue< cpp::any > queue;
         ChannelQueue< cpp::any > queue;
         std::function<void(cpp::any)> f;
-        std::function<void(mew::Mew*,void*)> fc;
+        std::function<void(mew::Mew*)> fc;
         std::string sub_topic;
     } ChannelReference;
 
@@ -85,19 +86,10 @@ public:
         // UV - experimental
         uv_loop_init( &_loop );
 
-        _pollScheduled.store(0);
-        _poller = new SelectIO();
-        _ioThread = std::thread([&]{
-            while(true)
-            {
-                this->processIO();
-            }
-        });
-
         _minTimerInterval = 0.001;
         _numAdditional = std::thread::hardware_concurrency() - 1;
         // cerr << "Number of additionnal threads = " << _numAdditional << endl;
-         _numAdditional = 0;
+//        _numAdditional = 0;
         _scheduler = std::make_shared<mew::JobScheduler>( _numAdditional );
         if( _numAdditional == 0 )
         {
@@ -147,6 +139,7 @@ public:
         return (void*)tref;
         */
 
+        return uvt;
 
     }
 
@@ -164,6 +157,7 @@ public:
         // Job * ioJob = createIOCheckJob();
         // _scheduler->push( ioJob );
         cerr << "io std::function FD=" << filedescriptor << endl;
+        /*
         IOReference * ioref = new IOReference();
         ioref->fd = filedescriptor;
         ioref->f = f;
@@ -172,6 +166,10 @@ public:
         _ioRefs.push_back( ioref );
         _poller->add( filedescriptor );
         return (void*)ioref;
+        */
+        UVPoller * uvp = new UVPoller( &_loop, this, f, filedescriptor );
+        _uvpollers.push_back( uvp );
+        return uvp;
     }
 
     template<typename R, typename Arg>
@@ -194,7 +192,7 @@ public:
 
         {
             sref->f = [f, this](cpp::any aobj){
-//                cerr << "SUB received type: " << demangle(aobj.type().name()) << endl;
+                //                cerr << "SUB received type: " << demangle(aobj.type().name()) << endl;
                 Arg couille0;
                 try{
                     couille0 = cpp::any_cast<Arg>( aobj );
@@ -279,7 +277,7 @@ public:
                         spub->sref->f( spub->item );
                         spub->sref->jobCpt--;
                         delete spub;
-                }, subpub);
+            }, subpub);
                 j->label() = "JOB_PUBLICATION";
                 _scheduler->push( j );
 
@@ -326,27 +324,13 @@ public:
                 cerr << e.what() << endl;
                 return;
             }
-//            cerr << "will call f_channel" << endl;
+            //            cerr << "will call f_channel" << endl;
             f(this, couille0);
-//            cerr << "called f_channel" << endl;
+            //            cerr << "called f_channel" << endl;
         };
 
-        // Create a subscription topic for the receiving end...
-        cref->fc = [cref](mew::Mew* m, void* nope){
-            cpp::any aa;
-            if( cref->queue.pop(aa) )
-            {
-//                cerr << "call_0" << endl;
-                cref->f( aa );
-                cerr << "call_1" << endl;
-            }
-            else
-            {
-                cerr << "rate." << endl;
-            }
-        };
+        cref->async_ref = new UVAsync( &_loop, this, f );
         cref->sub_topic = channel_name + "";
-        cref->sub_backend = (void*)(subscribe( cref->sub_topic, cref->fc ));
         _channels.insert( make_pair( channel_name, cref ) );
         //
 
@@ -364,21 +348,22 @@ public:
         };
 
         // Create a subscription topic for the receiving end...
-        cref->fc = [cref](mew::Mew* m, void* nope){
+        cref->fc = [cref](mew::Mew* m){
             cpp::any aa;
             if( cref->queue.pop(aa) )
             {
                 // cerr << "call_0" << endl;
                 cref->f( aa );
-//                cerr << "call_1" << endl;
+                //                cerr << "call_1" << endl;
             }
-            else
-            {
-                cerr << "encore rate." << endl;
-            }
+//            else
+//            {
+//                cerr << "encore rate." << endl;
+//            }
         };
+
+        cref->async_ref = new UVAsync( &_loop, this, cref->fc );
         cref->sub_topic = channel_name + "";
-        cref->sub_backend = (void*)(subscribe( cref->sub_topic, cref->fc ));
         _channels.insert( make_pair( channel_name, cref ) );
         //
 
@@ -404,7 +389,9 @@ public:
             cpp::any pany = obj;
             if( cref->queue.push( pany ) )
             {
-                this->publish( cref->sub_topic, (void*)(0) );
+                // cerr << "queue_size=" << cref->queue.size() << endl;
+                // this->publish( cref->sub_topic, (void*)(0) );
+                cref->async_ref->trigger();
             }
             else
             {
@@ -437,6 +424,9 @@ private:
 
     // UV - timers
     std::vector< UVTimer* > _uvtimers;
+
+    // UV - io poll
+    std::vector< UVPoller* > _uvpollers;
 
     // Timer
     std::mutex _timerLock;
