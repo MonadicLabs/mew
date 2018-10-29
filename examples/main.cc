@@ -217,6 +217,7 @@ int main( int argc, char** argv )
     g->addConnection( tn->out("out"), tn2->in("in") );
     cerr << "this is a test" << endl;
 
+    /*
     mew::Node * tn_ = mew::Node::create("Clock");
     tn_->setParameter( "port", 9941 );
     tn_->setContext( ws );
@@ -231,6 +232,7 @@ int main( int argc, char** argv )
     cerr << "tn2 id=" << tn2_->str_id() << endl;
     g->addConnection( tn_->out("out"), tn2_->in("in") );
     cerr << "this is a test again" << endl;
+    */
 
     ws->run();
 

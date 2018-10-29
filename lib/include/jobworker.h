@@ -15,6 +15,7 @@
 #include "workstealingqueue.h"
 #include "fifoqueue.h"
 #include "job.h"
+#include "utils.h"
 
 #ifdef MEW_USE_PROFILING
 #include "Remotery.h"
@@ -45,7 +46,7 @@ public:
         bool ret = _queue.push( j );
         if( ret )
         {
-
+            j->_scheduleTime = hrtime();
         }
         return ret;
     }
@@ -99,7 +100,10 @@ public:
     virtual bool push( Job* j )
     {
         if( _singleThreadQueue )
+        {
+            j->_scheduleTime = hrtime();
             return _singleThreadQueue->push(j);
+        }
         return JobWorker::push( j );
     }
 

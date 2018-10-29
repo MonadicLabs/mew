@@ -72,14 +72,13 @@ void mew::Mew::set_timer_interval(void *timer_ref, double dt_secs)
 
 mew::Job *mew::Mew::createUVLoopJob()
 {
-
     if( _numAdditional > 0 )
     {
         Job * uvJob = new Job( []( Job* j ){
                 mew::Mew * m = (mew::Mew*)j->userData();
                 uv_run( &(m->_loop), UV_RUN_ONCE);
                 Job * nextJob = m->createUVLoopJob();
-                j->pushChild( nextJob );
+                m->scheduler()->push( nextJob );
         }, this );
         uvJob->label() = "UV_UPDATE";
         return uvJob;
@@ -90,7 +89,7 @@ mew::Job *mew::Mew::createUVLoopJob()
                 mew::Mew * m = (mew::Mew*)j->userData();
                 uv_run( &(m->_loop), UV_RUN_ONCE);
                 Job * nextJob = m->createUVLoopJob();
-                j->pushChild( nextJob );
+                m->scheduler()->push( nextJob );
         }, this );
         uvJob->label() = "UV_UPDATE";
         return uvJob;

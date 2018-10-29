@@ -61,16 +61,18 @@ public:
     void run(JobWorker* worker)
     {
         // _joblock.lock();
-        _assignedWorker.store( worker );
+        // _assignedWorker.store( worker );
         //        cerr << "JOB:" << _label << endl;
 #ifdef MEW_USE_PROFILING
         rmt_BeginCPUSampleDynamic( _label.c_str(), 0);
 #endif
+
         _f();
+
 #ifdef MEW_USE_PROFILING
         rmt_EndCPUSample();
 #endif
-        _assignedWorker.store( 0 );
+        // _assignedWorker.store( 0 );
         // _joblock.unlock();
     }
 
@@ -93,6 +95,9 @@ public:
     {
         return _label;
     }
+
+    double _scheduleTime;
+    double _execTime;
 
 private:
     std::function<void(void)> _f;

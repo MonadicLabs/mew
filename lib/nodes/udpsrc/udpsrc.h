@@ -1,6 +1,8 @@
 
 #include <node.h>
 
+#include <mutex>
+
 #include <fcntl.h>
 #include <arpa/inet.h>
 #include <netinet/in.h>
@@ -28,6 +30,8 @@ private:
     int _lo;
     struct sockaddr_in serveraddr;
     //
+
+    std::mutex _execMtx;
 
 protected:
 

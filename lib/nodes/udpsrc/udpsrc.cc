@@ -61,6 +61,8 @@ void mew::UDPSrc::onContextChange(mew::WorkSpace *ctx)
 {
     mew::Mew * m = ctx->getRuntime();
     std::function<void(mew::Mew*,int)> f = [this](mew::Mew*, int fd){
+
+        std::unique_lock< std::mutex >( _execMtx );
         char buf[4096];
         // while(true)
         {
@@ -74,19 +76,17 @@ void mew::UDPSrc::onContextChange(mew::WorkSpace *ctx)
             else
             {
                 // cerr << "cc=" << cc << " buf=" << buf << endl;
-                Value ret(cc);
-                ret.setBinary( buf, cc );
-                this->out("out")->write( ret );
+//                Value ret(cc);
+//                ret.setBinary( buf, cc );
+//                this->out("out")->write( ret );
 
-                /*
                 // LOOPBACK TEST
-                cerr << "cc=" << cc << endl;
+//                cerr << "cc=" << cc << endl;
                 int serverlen = sizeof(serveraddr);
                 int n = sendto(_lo, buf, cc, 0, (const sockaddr*)(&serveraddr), serverlen);
                 if (n < 0)
                   cerr << "ERROR in sendto" << endl;
                 //
-                */
 
             }
         }
