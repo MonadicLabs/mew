@@ -8,12 +8,14 @@ void mew::UVAsync::periodic()
 //        rmt_BeginCPUSampleDynamic( "ASYNC_DIRECT", 0);
 //#endif
 
+    /*
     mew::Job * popo = new Job( []( mew::Job* j ) {
             UVPoller* pref = (UVPoller*)(j->userData());
             pref->exec();
     }, this );
     popo->label() = "ASYNC_POPO_EXECUTION";
     _context->scheduler()->push( popo );
+    */
 
 //    exec();
 

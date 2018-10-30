@@ -36,6 +36,9 @@ using namespace std;
 
 #include <cppbackports/any.h>
 
+//#define CDS_JOB_IMPLEMENTATION
+//#include "cds_job.h"
+
 void burn_cpu( int iter = 1e7 )
 {
     float f1;
@@ -162,10 +165,48 @@ public:
     }
 };
 
+/*
+static void workerTest(Context *jobCtx, Job *rootJob) {
+    cds::job::initWorker(jobCtx);
+    waitForJob(rootJob);
+}
+
+struct Job * createCoucou(struct Job* parent = 0)
+{
+    Job * jj = createJob([](struct Job* j, const void* userdata){
+        cerr << "coucou " << j << endl;
+        burn_cpu(1e7);
+        enqueueJob( createCoucou(j) );
+    }, parent, 0, 0);
+    return jj;
+}
+*/
+
 int main( int argc, char** argv )
 {
 
     /*
+    const int kNumWorkers=4;
+
+    Context * cdsx = createContext(4, 32);
+    initWorker( cdsx );
+
+//    typedef void (*JobFunction)(struct Job*, const void*);
+    Job * rootJob = createCoucou();
+    enqueueJob(rootJob);
+
+    std::thread workers[kNumWorkers-1];
+    for(int iThread=0; iThread<kNumWorkers-1; iThread+=1) {
+        workers[iThread] = std::thread(workerTest, cdsx, rootJob);
+    }
+    waitForJob(rootJob);
+    for(int iThread=0; iThread<kNumWorkers-1; iThread+=1) {
+        workers[iThread].join();
+    }
+
+    return 0;
+    */
+
     mew::Mew * m = new mew::Mew();
 
     // UDP TEST
@@ -189,7 +230,7 @@ int main( int argc, char** argv )
     m->io( io_test1, s );
     //
 
-//    m->timer( timer_func1, 0.1 );
+    m->timer( timer_func1, 0.1 );
 //    m->timer( timer_func1, 0.1 );
 //    m->timer( timer_func1, 0.001 );
 //    m->timer( timer_func1, 0.001 );
@@ -197,7 +238,6 @@ int main( int argc, char** argv )
     //    m->channel_open( "chan0", sub1 );
 
     m->run();
-    */
 
     mew::WorkSpace * ws = new mew::WorkSpace();
     mew::Graph * g = ws->createEmptyGraph();

@@ -14,6 +14,8 @@
 #include "timer.h"
 #include "safe_ptr.h"
 #include "selectio.h"
+
+#include "cds_job.h"
 #include "uvtimer.h"
 #include "uvpoller.h"
 #include "uvasync.h"
@@ -30,29 +32,6 @@ namespace mew
 
 class Mew
 {
-    typedef struct
-    {
-        Mew* context;
-        Timer t;
-        double dt_sec;
-        double approach;
-        std::function<void(Mew*, double)> f;
-        std::atomic< int > processed;
-    } TimerReference;
-
-    typedef struct
-    {
-        std::function<void(Mew*, int)> f;
-        int fd;
-        Mew* context;
-        std::atomic<int> processed;
-    } IOReference;
-
-    typedef struct
-    {
-        IOReference * ioref;
-    } IOTickInstance;
-
     typedef struct
     {
         size_t expected_type;
@@ -80,22 +59,7 @@ class Mew
     } ChannelReference;
 
 public:
-    Mew()
-    {
-
-        // UV - experimental
-        uv_loop_init( &_loop );
-
-        _minTimerInterval = 0.001;
-        _numAdditional = std::thread::hardware_concurrency() - 1;
-        // cerr << "Number of additionnal threads = " << _numAdditional << endl;
-//        _numAdditional = 0;
-        _scheduler = std::make_shared<mew::JobScheduler>( _numAdditional );
-        if( _numAdditional == 0 )
-        {
-            _minTimerInterval = 0.001;
-        }
-    }
+    Mew();
 
     virtual ~Mew()
     {
@@ -104,9 +68,11 @@ public:
 
     void run()
     {
+        /*
         Job * timerJob = createUVLoopJob();
         _scheduler->push( timerJob );
         return _scheduler->run();
+        */
     }
 
 
@@ -124,23 +90,7 @@ public:
         cerr << "timer std::function" << endl;
         UVTimer * uvt = new UVTimer( &_loop, this, f, dt_sec );
         _uvtimers.push_back( uvt );
-
-        /*
-        TimerReference* tref = new TimerReference();
-        tref->dt_sec = dt_sec;
-        tref->approach = std::numeric_limits<double>::max();
-        tref->f = f;
-        tref->t.reset();
-        tref->processed = 0;
-        tref->context = this;
-        _timerRefs.push_back( tref );
-        if( tref->dt_sec < _minTimerInterval )
-            _minTimerInterval = tref->dt_sec;
-        return (void*)tref;
-        */
-
         return uvt;
-
     }
 
     template<typename R, typename Arg>
@@ -154,19 +104,7 @@ public:
     template<typename R, typename Arg>
     void * io( std::function<R(Mew*, Arg)> f, int filedescriptor )
     {
-        // Job * ioJob = createIOCheckJob();
-        // _scheduler->push( ioJob );
         cerr << "io std::function FD=" << filedescriptor << endl;
-        /*
-        IOReference * ioref = new IOReference();
-        ioref->fd = filedescriptor;
-        ioref->f = f;
-        ioref->processed = 0;
-        ioref->context = this;
-        _ioRefs.push_back( ioref );
-        _poller->add( filedescriptor );
-        return (void*)ioref;
-        */
         UVPoller * uvp = new UVPoller( &_loop, this, f, filedescriptor );
         _uvpollers.push_back( uvp );
         return uvp;
@@ -259,6 +197,7 @@ public:
     template<typename T>
     void publish( const std::string& topic, T&& obj )
     {
+        /*
         // cerr << "**** TOPIC=" << topic << endl;
         std::unique_lock< std::mutex >( _subRegistryMtx );
         // Look for subscriber
@@ -280,20 +219,13 @@ public:
             }, subpub);
                 j->label() = "JOB_PUBLICATION";
                 _scheduler->push( j );
-
-                /*
-                cpp::any aobj = obj;
-                {
-                    sref->f( aobj );
-                }
-                */
-
             }
         }
         else
         {
             cerr << "Could not find topic \"" << topic << "\" to push to ." << endl;
         }
+        */
     }
 
     void printSubscriptions();
@@ -402,25 +334,24 @@ public:
         {
             cerr << "lol nope. " << channel_name << endl;
         }
-
     }
     //
 
     void set_timer_interval( void* timer_ref, double dt_secs );
 
-    std::shared_ptr< JobScheduler > scheduler()
-    {
-        return _scheduler;
-    }
-
 private:
     // Job Scheduler
-    std::shared_ptr< JobScheduler > _scheduler;
+//    std::shared_ptr< JobScheduler > _scheduler;
+    cds::job::Context * cds_ctx;
+    std::vector< std::thread > _workers;
+    void workerRoutine(cds::job::Context *jobCtx, cds::job::Job *rootJob);
     int _numAdditional;
+    cds::job::Job* _rootJob;
+    std::mutex mtx;
 
     // UV - experimental
     uv_loop_t _loop;
-    Job *createUVLoopJob();
+    cds::job::Job *createUVLoopJob(cds::job::Job *parent = 0);
 
     // UV - timers
     std::vector< UVTimer* > _uvtimers;
@@ -429,21 +360,7 @@ private:
     std::vector< UVPoller* > _uvpollers;
 
     // Timer
-    std::mutex _timerLock;
-    std::vector< TimerReference* > _timerRefs;
-    std::vector< TimerReference* > processTimers();
-    Job * createTimerCheckJob();
     double _minTimerInterval;
-
-    // IO
-    std::thread _ioThread;
-    std::atomic<int> _pollScheduled;
-    IOPoller * _poller;
-    std::mutex _ioLock;
-    std::vector< IOReference* > _ioRefs;
-    double _ioTimeoutSecs;
-    void processIO();
-    Job * createIOCheckJob();
 
     // PUB/SUB
     std::map< std::string, std::vector< SubscriptionReference* > > _subscriptions;

@@ -1,7 +1,42 @@
 
 #include "mew.h"
-
 #include "uvtimer.h"
+
+#define CDS_JOB_IMPLEMENTATION
+#include "cds_job.h"
+
+mew::Mew::Mew()
+{
+    // UV - experimental
+    uv_loop_init( &_loop );
+
+    _minTimerInterval = 0.1;
+    _numAdditional = std::thread::hardware_concurrency() - 1;
+    // cerr << "Number of additionnal threads = " << _numAdditional << endl;
+    // _numAdditional = 0;
+
+    // cds_job
+    cds_ctx = cds::job::createContext(_numAdditional + 1, 32);
+    cds::job::initWorker(cds_ctx);
+
+    if( _numAdditional == 0 )
+    {
+        _minTimerInterval = 0.001;
+    }
+
+    _rootJob = createUVLoopJob();
+    cds::job::enqueueJob( _rootJob );
+
+    // Start workers
+    for(int iThread=0; iThread<_numAdditional; iThread+=1) {
+        // workers[iThread] = std::thread(workerTest, cdsx, rootJob);
+        _workers.push_back( std::thread(&Mew::workerRoutine, this, cds_ctx, _rootJob) );
+    }
+
+    // lol wait ?
+    waitForJob(_rootJob);
+
+}
 
 bool mew::Mew::unsubscribe(void *subReference)
 {
@@ -57,21 +92,18 @@ void mew::Mew::printSubscriptions()
 
 void mew::Mew::set_timer_interval(void *timer_ref, double dt_secs)
 {
-    for( TimerReference* tref : _timerRefs )
-    {
-        if( tref == timer_ref )
-        {
-            tref->dt_sec = dt_secs;
-            if( tref->dt_sec < _minTimerInterval )
-            {
-                _minTimerInterval = tref->dt_sec;
-            }
-        }
-    }
+
 }
 
-mew::Job *mew::Mew::createUVLoopJob()
+void mew::Mew::workerRoutine( cds::job::Context* jobCtx, cds::job::Job* rootJob )
 {
+    cds::job::initWorker(jobCtx);
+    waitForJob(rootJob);
+}
+
+cds::job::Job* mew::Mew::createUVLoopJob( cds::job::Job* parent )
+{
+    /*
     if( _numAdditional > 0 )
     {
         Job * uvJob = new Job( []( Job* j ){
@@ -94,92 +126,24 @@ mew::Job *mew::Mew::createUVLoopJob()
         uvJob->label() = "UV_UPDATE";
         return uvJob;
     }
-}
+    */
 
-std::vector<mew::Mew::TimerReference *> mew::Mew::processTimers()
-{
-    std::vector< TimerReference* > ret;
-    _timerLock.lock();
-    for( int i = 0; i < _timerRefs.size(); ++i )
+    if( parent != 0 )
     {
-        TimerReference* tref = _timerRefs[i];
-        if( tref->processed == 0 && tref->t.elapsed() > tref->dt_sec )
-        {
-            ret.push_back(tref);
-        }
+        //        cds::job::waitForJob( parent );
     }
-    _timerLock.unlock();
-    return ret;
-}
 
-mew::Job *mew::Mew::createTimerCheckJob()
-{
-    Job * timerJob = new Job( []( Job* j ){
-            mew::Mew * m = (mew::Mew*)j->userData();
-            std::vector< TimerReference* > trigList = m->processTimers();
-            for( TimerReference* tref : trigList )
-    {
-            tref->processed = 1;
-            mew::Job * trigJob = new Job( []( mew::Job* j ) {
-            TimerReference * tr = (TimerReference*)j->userData();
-            tr->f( tr->context, tr->t.elapsed() );
-            tr->t.reset();
-            tr->processed = 0;
-}, tref );
-    trigJob->label() = "TIMER_CALLBACK";
-    j->pushChild( trigJob );
-}
+    cds::job::Job * jj = cds::job::createJob([](cds::job::Job* j, const void* userdata){
+            mew::Mew* self = (mew::Mew*)userdata;
+            self->mtx.lock();
+            cerr << "coucou " << j << endl;
+            uv_run( &(self->_loop), UV_RUN_DEFAULT);
+            // sleep(1);
+            cds::job::enqueueJob( self->createUVLoopJob(j) );
+            self->mtx.unlock();
+}, parent, this, sizeof(mew::Mew*) );
+    return jj;
 
-usleep( (int)((m->_minTimerInterval / 10.0) * 1000000.0) );
-
-// Should be half the smallest timer tick value
-j->pushChild( m->createTimerCheckJob() );
-}, this );
-timerJob->label() = "TIMER_CHECK";
-return timerJob;
-}
-
-void mew::Mew::processIO()
-{
-    std::vector< int > rfd = _poller->poll( 0.0 );
-    for( int fd : rfd )
-    {
-        for( IOReference* ioref : _ioRefs )
-        {
-            if( ioref->fd == fd )
-            {
-                ioref->processed = 1;
-                ioref->f( ioref->context, fd );
-                ioref->processed = 0;
-
-                //                ioref->processed = 1;
-                //                mew::Job * ioJob = new Job( []( mew::Job* j ) {
-                //                        IOReference * ioref = (IOReference*)j->userData();
-                //                        ioref->f( ioref->context, ioref->fd );
-                //                        ioref->processed = 0;
-                //                }, ioref );
-                //                ioJob->label() = "IO_PROCESS";
-                //                _scheduler->push( ioJob );
-
-            }
-        }
-    }
-}
-
-mew::Job *mew::Mew::createIOCheckJob()
-{
-    Job * ioJob = new Job( []( Job* j ){
-            mew::Mew * m = (mew::Mew*)j->userData();
-            m->processIO();
-            m->_pollScheduled.store( m->_pollScheduled.load() - 1 );
-            if( m->_pollScheduled.load() <= 0 )
-    {
-            j->pushChild( m->createIOCheckJob() );
-}
-}, this );
-    ioJob->label() = "IO_CHECK";
-    _pollScheduled.store( _pollScheduled.load() + 1 );
-    return ioJob;
 }
 
 void mew::Mew::processSubscriber(mew::Mew::SubscriptionReference *sref)
