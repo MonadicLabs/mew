@@ -210,6 +210,7 @@ int main( int argc, char** argv )
     mew::Mew * m = new mew::Mew();
 
     // UDP TEST
+    /*
 #define BUFLEN 2048
 #define NPACK 10
 
@@ -229,6 +230,7 @@ int main( int argc, char** argv )
         cerr << ":( bind" << endl;
     m->io( io_test1, s );
     //
+    */
 
     m->timer( timer_func1, 0.1 );
 //    m->timer( timer_func1, 0.1 );
@@ -239,6 +241,7 @@ int main( int argc, char** argv )
 
     m->run();
 
+    /*
     mew::WorkSpace * ws = new mew::WorkSpace();
     mew::Graph * g = ws->createEmptyGraph();
 
@@ -274,7 +277,7 @@ int main( int argc, char** argv )
     cerr << "this is a test again" << endl;
     */
 
-    ws->run();
+    // ws->run();
 
     /*
     std::deque< cpp::any > anyqueue;

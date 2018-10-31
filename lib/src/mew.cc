@@ -13,7 +13,7 @@ mew::Mew::Mew()
     _minTimerInterval = 0.1;
     _numAdditional = std::thread::hardware_concurrency() - 1;
     // cerr << "Number of additionnal threads = " << _numAdditional << endl;
-    // _numAdditional = 0;
+    _numAdditional = 0;
 
     // cds_job
     cds_ctx = cds::job::createContext(_numAdditional + 1, 32);
@@ -27,11 +27,18 @@ mew::Mew::Mew()
     _rootJob = createUVLoopJob();
     cds::job::enqueueJob( _rootJob );
 
+}
+
+void mew::Mew::run()
+{
+
+    /*
     // Start workers
     for(int iThread=0; iThread<_numAdditional; iThread+=1) {
         // workers[iThread] = std::thread(workerTest, cdsx, rootJob);
         _workers.push_back( std::thread(&Mew::workerRoutine, this, cds_ctx, _rootJob) );
     }
+    */
 
     // lol wait ?
     waitForJob(_rootJob);
@@ -135,15 +142,39 @@ cds::job::Job* mew::Mew::createUVLoopJob( cds::job::Job* parent )
 
     cds::job::Job * jj = cds::job::createJob([](cds::job::Job* j, const void* userdata){
             mew::Mew* self = (mew::Mew*)userdata;
-            self->mtx.lock();
+            // self->mtx.lock();
             cerr << "coucou " << j << endl;
-            uv_run( &(self->_loop), UV_RUN_DEFAULT);
-            // sleep(1);
-            cds::job::enqueueJob( self->createUVLoopJob(j) );
-            self->mtx.unlock();
-}, parent, this, sizeof(mew::Mew*) );
+            int runret = uv_run( &(self->_loop), UV_RUN_NOWAIT);
+            cerr << "runret=" << runret << endl;
+            sleep(1);
+            cds::job::Job* nextJob = self->createUVLoopJob(j);
+            int eret = cds::job::enqueueJob( self->createUVLoopJob(j) );
+            cerr << "eret=" << eret << endl;
+//            cds::job::waitForJob( nextJob );
+            // self->mtx.unlock();
+    }, parent, this, sizeof(mew::Mew*) );
+    cerr << "jj=" << jj << endl;
     return jj;
 
+}
+
+cds::job::Job *mew::Mew::createRootJob()
+{
+    /*
+    cds::job::Job * jj = cds::job::createJob([](cds::job::Job* j, const void* userdata){
+            mew::Mew* self = (mew::Mew*)userdata;
+            // self->mtx.lock();
+            cerr << "ROOT coucou " << j << endl;
+            int runret = uv_run( &(self->_loop), UV_RUN_ONCE);
+             cerr << "runret=" << runret << endl;
+            sleep(1);
+            cds::job::enqueueJob( self->createUVLoopJob(j) );
+            // self->mtx.unlock();
+    }, parent, this, sizeof(mew::Mew*) );
+    cerr << "jj=" << jj << endl;
+    return jj;
+    */
+    return nullptr;
 }
 
 void mew::Mew::processSubscriber(mew::Mew::SubscriptionReference *sref)

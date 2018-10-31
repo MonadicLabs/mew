@@ -66,15 +66,7 @@ public:
 
     }
 
-    void run()
-    {
-        /*
-        Job * timerJob = createUVLoopJob();
-        _scheduler->push( timerJob );
-        return _scheduler->run();
-        */
-    }
-
+    void run();
 
     template<typename R, typename Arg>
     void * timer( R (*fptr)(Mew*, Arg), double dt_usec )
@@ -352,6 +344,7 @@ private:
     // UV - experimental
     uv_loop_t _loop;
     cds::job::Job *createUVLoopJob(cds::job::Job *parent = 0);
+    cds::job::Job *createRootJob();
 
     // UV - timers
     std::vector< UVTimer* > _uvtimers;

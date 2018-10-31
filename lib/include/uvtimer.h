@@ -35,7 +35,7 @@ public:
         int uvtret = uv_timer_start(m_timer.get(), [](uv_timer_t* timer) {
                 UVTimer * self = (UVTimer*)timer->data;
                 self->periodic();
-    },
+        },
 
                 // Repeat once a second.
                 _dt_seconds * 1000.0, _dt_seconds * 1000.0 );
