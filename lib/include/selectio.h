@@ -8,6 +8,8 @@
 #include <iostream>
 #include <atomic>
 
+#include <unistd.h>
+
 using namespace std;
 
 namespace mew

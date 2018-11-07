@@ -16,13 +16,14 @@ class UVPoller
 {
 public:
     UVPoller( uv_loop_t* loop,
-             mew::Mew* context,
-             std::function<void(mew::Mew*, int filedescriptor)> f,
-             int filedescritptor )
+              mew::Mew* context,
+              std::function<void(mew::Mew*, int filedescriptor)> f,
+              int filedescritptor )
         : m_poll(std::make_shared<uv_poll_t>()),
           _context( context ),
           _fd(filedescritptor)
     {
+        _triggerCpt = 0;
         _f = f;
 
         // Initialize the timer.
@@ -36,8 +37,9 @@ public:
         int uvpret = uv_poll_start(m_poll.get(), UV_READABLE, [](uv_poll_t* p, int status, int events)
         {
                 UVPoller * self = (UVPoller*)p->data;
+                cerr << "status=" << status << " events=" << events << " IO_TRIGGER cpt=" << self->_triggerCpt++ << endl;
                 self->periodic();
-        });
+    });
 
         cerr << "uvpret=" << uvpret << endl;
 
@@ -58,6 +60,7 @@ private:
     std::function<void(mew::Mew*, int fd)> _f;
     mew::Mew * _context;
     int _fd;
+    int _triggerCpt;
 
 protected:
 

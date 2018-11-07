@@ -4,6 +4,7 @@
 
 void mew::Job::pushChild(Job* j)
 {
+    /*
     JobWorker * w = _assignedWorker.load();
     if( w )
     {
@@ -22,4 +23,5 @@ void mew::Job::pushChild(Job* j)
         cerr << "w=" << w << endl;
         delete j;
     }
+    */
 }

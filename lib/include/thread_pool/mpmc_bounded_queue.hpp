@@ -63,7 +63,7 @@ public:
      * @param size Power of 2 number - queue length.
      * @throws std::invalid_argument if size is bad.
      */
-    explicit MPMCBoundedQueue(size_t size = 1024);
+    explicit MPMCBoundedQueue(size_t size);
 
     /**
      * @brief Move ctor implementation.

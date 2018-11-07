@@ -1,7 +1,7 @@
 
 #include "mew.h"
-
 #include "uvtimer.h"
+#include "job.h"
 
 bool mew::Mew::unsubscribe(void *subReference)
 {
@@ -76,7 +76,7 @@ mew::Job *mew::Mew::createUVLoopJob()
     {
         Job * uvJob = new Job( []( Job* j ){
                 mew::Mew * m = (mew::Mew*)j->userData();
-                uv_run( &(m->_loop), UV_RUN_ONCE);
+                uv_run( &(m->_loop), UV_RUN_NOWAIT);
                 Job * nextJob = m->createUVLoopJob();
                 m->scheduler()->push( nextJob );
         }, this );
@@ -87,7 +87,7 @@ mew::Job *mew::Mew::createUVLoopJob()
     {
         Job * uvJob = new Job( []( Job* j ){
                 mew::Mew * m = (mew::Mew*)j->userData();
-                uv_run( &(m->_loop), UV_RUN_ONCE);
+                uv_run( &(m->_loop), UV_RUN_DEFAULT);
                 Job * nextJob = m->createUVLoopJob();
                 m->scheduler()->push( nextJob );
         }, this );

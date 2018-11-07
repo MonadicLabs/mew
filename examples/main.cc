@@ -165,7 +165,6 @@ public:
 int main( int argc, char** argv )
 {
 
-    /*
     mew::Mew * m = new mew::Mew();
 
     // UDP TEST
@@ -197,8 +196,8 @@ int main( int argc, char** argv )
     //    m->channel_open( "chan0", sub1 );
 
     m->run();
-    */
 
+/*
     mew::WorkSpace * ws = new mew::WorkSpace();
     mew::Graph * g = ws->createEmptyGraph();
 
@@ -217,7 +216,6 @@ int main( int argc, char** argv )
     g->addConnection( tn->out("out"), tn2->in("in") );
     cerr << "this is a test" << endl;
 
-    /*
     mew::Node * tn_ = mew::Node::create("Clock");
     tn_->setParameter( "port", 9941 );
     tn_->setContext( ws );
@@ -232,9 +230,9 @@ int main( int argc, char** argv )
     cerr << "tn2 id=" << tn2_->str_id() << endl;
     g->addConnection( tn_->out("out"), tn2_->in("in") );
     cerr << "this is a test again" << endl;
-    */
 
     ws->run();
+    */
 
     /*
     std::deque< cpp::any > anyqueue;

@@ -32,6 +32,7 @@ private:
     //
 
     std::mutex _execMtx;
+    int _byteCpt;
 
 protected:
 

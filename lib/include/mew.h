@@ -10,7 +10,8 @@
 
 #include "blockingconcurrentqueue.h"
 #include "channelqueue.h"
-#include "jobworker.h"
+#include "jobscheduler.h"
+#include "job.h"
 #include "timer.h"
 #include "safe_ptr.h"
 #include "selectio.h"
@@ -24,6 +25,8 @@
 const char* demangle(const char* name);
 
 #include <uv.h>
+
+#include "thread_pool.hpp"
 
 namespace mew
 {
@@ -89,8 +92,8 @@ public:
         _minTimerInterval = 0.001;
         _numAdditional = std::thread::hardware_concurrency() - 1;
         // cerr << "Number of additionnal threads = " << _numAdditional << endl;
-//        _numAdditional = 0;
-        _scheduler = std::make_shared<mew::JobScheduler>( _numAdditional );
+        _numAdditional = 0;
+        _scheduler = std::make_shared<mew::JobScheduler>();
         if( _numAdditional == 0 )
         {
             _minTimerInterval = 0.001;
@@ -104,9 +107,10 @@ public:
 
     void run()
     {
-        Job * timerJob = createUVLoopJob();
-        _scheduler->push( timerJob );
-        return _scheduler->run();
+        // Job * timerJob = createUVLoopJob();
+        // _scheduler->push( timerJob );
+        // return _scheduler->run();
+        uv_run( &_loop, UV_RUN_DEFAULT );
     }
 
 
@@ -452,6 +456,9 @@ private:
 
     // CHANNELS
     std::map< std::string, ChannelReference* > _channels;
+
+    // THREADPOOL
+    tp::ThreadPool pool;
 
 protected:
 

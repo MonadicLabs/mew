@@ -20,7 +20,7 @@
 #include <cstring>
 
 mew::UDPSrc::UDPSrc(WorkSpace *ctx)
-    :Node(ctx)
+    :Node(ctx), _byteCpt(0)
 {
     declare_output( "out" );
     declare_parameter( "port", Value::NUMBER, 9940 );
@@ -62,19 +62,22 @@ void mew::UDPSrc::onContextChange(mew::WorkSpace *ctx)
     mew::Mew * m = ctx->getRuntime();
     std::function<void(mew::Mew*,int)> f = [this](mew::Mew*, int fd){
 
+
         std::unique_lock< std::mutex >( _execMtx );
         char buf[4096];
         // while(true)
         {
             memset( buf, 0, 4096 );
             int cc = read( fd, buf, 4096 );
-            //cerr << "cc=" << cc << endl;
             if( cc <= 0 )
             {
+                cerr << "cc=" << cc << endl;
                 // break;
             }
             else
             {
+                _byteCpt += cc;
+                cerr << "_byteCpt=" << _byteCpt << endl;
                 // cerr << "cc=" << cc << " buf=" << buf << endl;
 //                Value ret(cc);
 //                ret.setBinary( buf, cc );
@@ -82,10 +85,10 @@ void mew::UDPSrc::onContextChange(mew::WorkSpace *ctx)
 
                 // LOOPBACK TEST
 //                cerr << "cc=" << cc << endl;
-                int serverlen = sizeof(serveraddr);
-                int n = sendto(_lo, buf, cc, 0, (const sockaddr*)(&serveraddr), serverlen);
-                if (n < 0)
-                  cerr << "ERROR in sendto" << endl;
+//                int serverlen = sizeof(serveraddr);
+//                int n = sendto(_lo, buf, cc, 0, (const sockaddr*)(&serveraddr), serverlen);
+//                if (n < 0)
+//                  cerr << "ERROR in sendto" << endl;
                 //
 
             }
@@ -105,6 +108,7 @@ void mew::UDPSrc::onSetParameter(const string &paramName, Value value)
 
 void mew::UDPSrc::init_udp_socket()
 {
+    cerr << "init_udp_socket" << endl;
     if( _fd >= 0 )
     {
         // Close previous socket first
@@ -119,7 +123,7 @@ void mew::UDPSrc::init_udp_socket()
         //diep("socket");
         cerr << ":( socket." << endl;
 
-    setNonBlocking( _fd );
+    // setNonBlocking( _fd );
 
     memset((char *) &si_me, 0, sizeof(si_me));
     si_me.sin_family = AF_INET;
