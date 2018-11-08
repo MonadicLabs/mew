@@ -101,7 +101,7 @@ int cpt=0;
 void timer_func1( mew::Mew* ctx, double dt_usec )
 {
     cerr << "timer_func1 dt=" << std::setprecision(20) << dt_usec << endl;
-    burn_cpu(1e4);
+    burn_cpu(1e7);
 }
 
 void timer_func2( mew::Mew* ctx, double dt_usec )
@@ -162,6 +162,44 @@ public:
     }
 };
 
+static int nread_cpt;
+
+void poll_cb( uv_poll_t* handle, int status, int events)
+{
+    int fd = (int)(handle->data);
+    char buf[4096];
+    int rr = -1;
+    cerr << "**** START" << endl;
+    while( true )
+    {
+        rr = read( fd, buf, 32 );
+        if( rr <= 0 )
+            break;
+        stringstream sstr;
+        sstr << "UV read " << rr << " bytes " << " from fd=" << fd << endl;
+        cerr << sstr.str();
+        cerr << "TOTAL=" << nread_cpt << endl;
+        nread_cpt += rr;
+    }
+    cerr << "**** STOP" << endl;
+}
+
+static void my_alloc_cb(uv_handle_t* handle, size_t suggested_size, uv_buf_t* buf) {
+    buf->base = malloc(suggested_size);
+    buf->len = suggested_size;
+}
+
+static void recv_cb(uv_udp_t* handle, ssize_t nread, const uv_buf_t* rcvbuf, const struct sockaddr* addr, unsigned flags)
+{
+    if (nread > 0) {
+        nread_cpt += nread;
+        printf("%lu\n",nread_cpt);
+        // printf("%s",rcvbuf->base);
+    }
+    // sprintf("free  :%lu %p\n",rcvbuf->len,rcvbuf->base);
+    free(rcvbuf->base);
+}
+
 int main( int argc, char** argv )
 {
 
@@ -183,212 +221,250 @@ int main( int argc, char** argv )
     si_me.sin_family = AF_INET;
     si_me.sin_port = htons(9940);
     si_me.sin_addr.s_addr = htonl(INADDR_ANY);
+
+    // UV TEST
+    int a, len;
+    int tmp = 1024*1024*20;
+    getsockopt(s, SOL_SOCKET, SO_RCVBUF, &a, &len);
+    printf("started as                  %d, setting it as %d\n", a, tmp );
+    if (setsockopt(s, SOL_SOCKET, SO_RCVBUF, &tmp, sizeof(tmp)) < 0) {
+        // log_net_error(h, AV_LOG_WARNING, "setsockopt(SO_RECVBUF)");
+    }
+    len = sizeof(tmp);
+    if (getsockopt(s, SOL_SOCKET, SO_RCVBUF, &tmp, &len) < 0) {
+        // log_net_error(h, AV_LOG_WARNING, "getsockopt(SO_RCVBUF)");
+    } else {
+        // av_log(h, AV_LOG_DEBUG, "end receive buffer size reported is %d\n", tmp);
+    }
+
     if (::bind(s, (const sockaddr*)(&si_me), sizeof(si_me))==-1)
         cerr << ":( bind" << endl;
+
     m->io( io_test1, s );
     //
+    //    nread_cpt = 0;
+    //    uv_poll_t hpoll;
+    //    memset( &hpoll,0,sizeof(uv_poll_t));
+    //    hpoll.data = (void*)s;
+    //    uv_poll_init(uv_default_loop(), &hpoll, s);
+    //    uv_poll_start( &hpoll, UV_READABLE, poll_cb );
+    //    uv_run( uv_default_loop(), UV_RUN_DEFAULT );
+    //
 
-//    m->timer( timer_func1, 0.1 );
-//    m->timer( timer_func1, 0.1 );
-//    m->timer( timer_func1, 0.001 );
-//    m->timer( timer_func1, 0.001 );
+    // UV TEST #2
+    //    uv_udp_t hudp;
+    //    uv_udp_init( uv_default_loop(), &hudp );
+    //    uv_udp_bind( &hudp, (const sockaddr*)(&si_me), 0 );
+    //    uv_udp_recv_start( &hudp, my_alloc_cb, recv_cb );
+    //    uv_run( uv_default_loop(), UV_RUN_DEFAULT );
+    //
+
+    //
+
+    //    m->timer( timer_func1, 0.1 );
+    //    m->timer( timer_func1, 0.1 );
+    m->timer( timer_func1, 0.001 );
+    //    m->timer( timer_func1, 0.001 );
 
     //    m->channel_open( "chan0", sub1 );
 
     m->run();
 
-/*
-    mew::WorkSpace * ws = new mew::WorkSpace();
-    mew::Graph * g = ws->createEmptyGraph();
-
-    mew::Node * tn = mew::Node::create("UDPSrc");
-    tn->setParameter( "port", 9940 );
-    tn->setContext( ws );
-    tn->setParameter( "rate", 0.0001 );
-    mew::Node * tn2 = mew::Node::create("UDPSink");
-        tn2->setParameter("host", "127.0.0.1");
-        tn2->setParameter("port", 5000);
-    tn2->setContext( ws );
-    g->addNode( tn );
-    g->addNode( tn2 );
-    cerr << "tn id=" << tn->str_id() << endl;
-    cerr << "tn2 id=" << tn2->str_id() << endl;
-    g->addConnection( tn->out("out"), tn2->in("in") );
-    cerr << "this is a test" << endl;
-
-    mew::Node * tn_ = mew::Node::create("Clock");
-    tn_->setParameter( "port", 9941 );
-    tn_->setContext( ws );
-    tn_->setParameter( "rate", 0.001 );
-    mew::Node * tn2_ = mew::Node::create("Console");
-        tn2_->setParameter("host", "127.0.0.1");
-        tn2_->setParameter("port", 6000);
-    tn2_->setContext( ws );
-    g->addNode( tn_ );
-    g->addNode( tn2_ );
-    cerr << "tn id=" << tn_->str_id() << endl;
-    cerr << "tn2 id=" << tn2_->str_id() << endl;
-    g->addConnection( tn_->out("out"), tn2_->in("in") );
-    cerr << "this is a test again" << endl;
-
-    ws->run();
-    */
 
     /*
-    std::deque< cpp::any > anyqueue;
-    for( int i = 0; i < 1000000; ++i )
-    {
-        if( i % 2 == 0 )
-        {
-            anyqueue.push_back( 1234.0 );
-        }
-        else
-        {
-            anyqueue.push_back( std::string("coucou") );
-        }
-    }
-    cerr << "done queue " << endl;
+            mew::WorkSpace * ws = new mew::WorkSpace();
+            mew::Graph * g = ws->createEmptyGraph();
 
-    int udpPort = 9940 + rand() % 1000;
-    cerr << "udpPort=" << udpPort << endl;
+            mew::Node * tn = mew::Node::create("UDPSrc");
+            tn->setParameter( "port", 9940 );
+            tn->setContext( ws );
+            tn->setParameter( "rate", 0.0001 );
+            mew::Node * tn2 = mew::Node::create("UDPSink");
+                tn2->setParameter("host", "127.0.0.1");
+                tn2->setParameter("port", 5000);
+            tn2->setContext( ws );
+            g->addNode( tn );
+            g->addNode( tn2 );
+            cerr << "tn id=" << tn->str_id() << endl;
+            cerr << "tn2 id=" << tn2->str_id() << endl;
+            g->addConnection( tn->out("out"), tn2->in("in") );
+            cerr << "this is a test" << endl;
+            */
 
-    mew::Mew m;
-    double dt = 0.001;
-    for( int k = 0; k < 1; ++k )
-    {
-        m.timer( timer_func2, 0.001 );
-    }
-    m.subscribe( "popo", sub1 );
-    //    m.subscribe( "capital", sub2 );
+    /*
+            mew::Node * tn_ = mew::Node::create("Clock");
+            tn_->setParameter( "port", 9941 );
+            tn_->setContext( ws );
+            tn_->setParameter( "rate", 0.001 );
+            mew::Node * tn2_ = mew::Node::create("Console");
+                tn2_->setParameter("host", "127.0.0.1");
+                tn2_->setParameter("port", 6000);
+            tn2_->setContext( ws );
+            g->addNode( tn_ );
+            g->addNode( tn2_ );
+            cerr << "tn id=" << tn_->str_id() << endl;
+            cerr << "tn2 id=" << tn2_->str_id() << endl;
+            g->addConnection( tn_->out("out"), tn2_->in("in") );
+            cerr << "this is a test again" << endl;
+            */
 
-    //    m.timer( timer_func1, dt );
-    //    m.timer( timer_func1, dt * 2.0 );
-    //    m.timer( timer_func1, dt * 4.0 );
+    //    ws->run();
 
-    // UDP TEST
-#define BUFLEN 512
-#define NPACK 10
+    /*
+            std::deque< cpp::any > anyqueue;
+            for( int i = 0; i < 1000000; ++i )
+            {
+                if( i % 2 == 0 )
+                {
+                    anyqueue.push_back( 1234.0 );
+                }
+                else
+                {
+                    anyqueue.push_back( std::string("coucou") );
+                }
+            }
+            cerr << "done queue " << endl;
 
-    struct sockaddr_in si_me, si_other;
-    int s, i, slen=sizeof(si_other);
-    char buf[BUFLEN];
+            int udpPort = 9940 + rand() % 1000;
+            cerr << "udpPort=" << udpPort << endl;
 
-    if ((s=socket(AF_INET, SOCK_DGRAM, IPPROTO_UDP))==-1)
-        //diep("socket");
-        cerr << ":( socket." << endl;
+            mew::Mew m;
+            double dt = 0.001;
+            for( int k = 0; k < 1; ++k )
+            {
+                m.timer( timer_func2, 0.001 );
+            }
+            m.subscribe( "popo", sub1 );
+            //    m.subscribe( "capital", sub2 );
 
-    memset((char *) &si_me, 0, sizeof(si_me));
-    si_me.sin_family = AF_INET;
-    si_me.sin_port = htons(udpPort);
-    si_me.sin_addr.s_addr = htonl(INADDR_ANY);
-    if (::bind(s, (const sockaddr*)(&si_me), sizeof(si_me))==-1)
-        cerr << ":( bind" << endl;
-    m.io( io_test1, s );
-    //
+            //    m.timer( timer_func1, dt );
+            //    m.timer( timer_func1, dt * 2.0 );
+            //    m.timer( timer_func1, dt * 4.0 );
 
-    std::thread popo([&](){
-        while(true)
-        {
+            // UDP TEST
+        #define BUFLEN 512
+        #define NPACK 10
+
+            struct sockaddr_in si_me, si_other;
+            int s, i, slen=sizeof(si_other);
+            char buf[BUFLEN];
+
+            if ((s=socket(AF_INET, SOCK_DGRAM, IPPROTO_UDP))==-1)
+                //diep("socket");
+                cerr << ":( socket." << endl;
+
+            memset((char *) &si_me, 0, sizeof(si_me));
+            si_me.sin_family = AF_INET;
+            si_me.sin_port = htons(udpPort);
+            si_me.sin_addr.s_addr = htonl(INADDR_ANY);
+            if (::bind(s, (const sockaddr*)(&si_me), sizeof(si_me))==-1)
+                cerr << ":( bind" << endl;
+            m.io( io_test1, s );
+            //
+
+            std::thread popo([&](){
+                while(true)
+                {
+                    sleep(1);
+                    mew::Graph g( &m );
+                    TestNode popo( &m, &g );
+                    TestNode popo2( &m, &g );
+                    mew::Connection conn( popo.out("out0"), popo2.in("in0") );
+                    sleep(1);
+                }
+            });
+
             sleep(1);
-            mew::Graph g( &m );
-            TestNode popo( &m, &g );
-            TestNode popo2( &m, &g );
-            mew::Connection conn( popo.out("out0"), popo2.in("in0") );
-            sleep(1);
-        }
-    });
 
-    sleep(1);
+            m.run();
 
-    m.run();
+            //    srand( time(NULL) );
+            //    //    mew::Job j( job_func1 );
+            //    std::vector< mew::Job* > jobs;
+            //    for( int k= 0; k < 10; ++k )
+            //    {
+            //        mew::Job * popo = new mew::Job( []( mew::Job* j ){
+            //                j->test();
+            //        });
+            //        jobs.push_back( popo );
+            //    }
 
-    //    srand( time(NULL) );
-    //    //    mew::Job j( job_func1 );
-    //    std::vector< mew::Job* > jobs;
-    //    for( int k= 0; k < 10; ++k )
-    //    {
-    //        mew::Job * popo = new mew::Job( []( mew::Job* j ){
-    //                j->test();
-    //        });
-    //        jobs.push_back( popo );
-    //    }
+            //    for( mew::Job* j : jobs )
+            //    {
+            //        j->run();
+            //    }
 
-    //    for( mew::Job* j : jobs )
-    //    {
-    //        j->run();
-    //    }
+            //    return 0;
 
-    //    return 0;
-
-    //    mew::JobScheduler sched;
-    //    sched.push( new mew::Job( job_func1 ) );
-    //    sched.run();
-    */
+            //    mew::JobScheduler sched;
+            //    sched.push( new mew::Job( job_func1 ) );
+            //    sched.run();
+            */
 
     return 0;
 
 }
 
 /*
-#include <functional>
-#include <stdio.h>
-#include <iostream>
+        #include <functional>
+        #include <stdio.h>
+        #include <iostream>
 
-template<typename F>
-void AFunctionThatTakesLambdaFunctionAsArgument( F&& lambda )
-{
-    std::string hello("hello world");
-    lambda( hello );
-}
-
-void lambdaExample1()
-{
-    std::string prefix = "Method1 Using std::function ";
-    std::function<void(std::string)>lambda = [prefix] (std::string message) -> int
-    {
-        std::cout << prefix.c_str() << ": " << message.c_str() << "\n";
-        return 0;
-    };
-    AFunctionThatTakesLambdaFunctionAsArgument( lambda );
-}
-
-void lambdaExample2()
-{
-    typedef int (*MyLambda)(std::string );
-    MyLambda lambda  = [] (std::string message) -> int
-    {
-        std::cout << std::string("Method2 Using typedef function ").c_str() <<
-": " << message.c_str() << "\n";
-        return 0;
-    };
-    AFunctionThatTakesLambdaFunctionAsArgument( lambda );
-}
-
-void lambdaExample3()
-{
-    struct MyClosure
-    {
-        std::string m_prefix;
-        int operator() (std::string message)
+        template<typename F>
+        void AFunctionThatTakesLambdaFunctionAsArgument( F&& lambda )
         {
-            std::cout << m_prefix.c_str() << ": " << message.c_str() << "\n";
+            std::string hello("hello world");
+            lambda( hello );
+        }
+
+        void lambdaExample1()
+        {
+            std::string prefix = "Method1 Using std::function ";
+            std::function<void(std::string)>lambda = [prefix] (std::string message) -> int
+            {
+                std::cout << prefix.c_str() << ": " << message.c_str() << "\n";
+                return 0;
+            };
+            AFunctionThatTakesLambdaFunctionAsArgument( lambda );
+        }
+
+        void lambdaExample2()
+        {
+            typedef int (*MyLambda)(std::string );
+            MyLambda lambda  = [] (std::string message) -> int
+            {
+                std::cout << std::string("Method2 Using typedef function ").c_str() <<
+        ": " << message.c_str() << "\n";
+                return 0;
+            };
+            AFunctionThatTakesLambdaFunctionAsArgument( lambda );
+        }
+
+        void lambdaExample3()
+        {
+            struct MyClosure
+            {
+                std::string m_prefix;
+                int operator() (std::string message)
+                {
+                    std::cout << m_prefix.c_str() << ": " << message.c_str() << "\n";
+                    return 0;
+                }
+            };
+            MyClosure lambda;
+            lambda.m_prefix = "Method3 Using struct ";//capture data
+            AFunctionThatTakesLambdaFunctionAsArgument( lambda );
+        }
+
+        void lambdaExamples()
+        {
+            lambdaExample1();
+            lambdaExample2();
+            lambdaExample3();
+        }
+        int main(int , char **)
+        {
+            lambdaExamples();
             return 0;
         }
-    };
-    MyClosure lambda;
-    lambda.m_prefix = "Method3 Using struct ";//capture data
-    AFunctionThatTakesLambdaFunctionAsArgument( lambda );
-}
-
-void lambdaExamples()
-{
-    lambdaExample1();
-    lambdaExample2();
-    lambdaExample3();
-}
-int main(int , char **)
-{
-    lambdaExamples();
-    return 0;
-}
-*/
+        */

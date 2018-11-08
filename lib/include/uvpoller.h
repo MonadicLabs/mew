@@ -27,7 +27,7 @@ public:
         _f = f;
 
         // Initialize the timer.
-        uv_poll_init(loop, m_poll.get(), _fd);
+        uv_poll_init_socket(loop, m_poll.get(), _fd);
 
         //
         m_poll->data = this; // Note: m_timer->data is a void*

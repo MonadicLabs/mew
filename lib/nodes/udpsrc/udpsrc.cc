@@ -65,14 +65,14 @@ void mew::UDPSrc::onContextChange(mew::WorkSpace *ctx)
 
         std::unique_lock< std::mutex >( _execMtx );
         char buf[4096];
-        // while(true)
+        while(true)
         {
             memset( buf, 0, 4096 );
             int cc = read( fd, buf, 4096 );
             if( cc <= 0 )
             {
                 cerr << "cc=" << cc << endl;
-                // break;
+                break;
             }
             else
             {

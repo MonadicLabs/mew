@@ -10,7 +10,7 @@
 
 #include "blockingconcurrentqueue.h"
 #include "channelqueue.h"
-#include "jobscheduler.h"
+#include "tpscheduler.h"
 #include "job.h"
 #include "timer.h"
 #include "safe_ptr.h"
@@ -25,8 +25,6 @@
 const char* demangle(const char* name);
 
 #include <uv.h>
-
-#include "thread_pool.hpp"
 
 namespace mew
 {
@@ -86,6 +84,11 @@ public:
     Mew()
     {
 
+#ifdef MEW_USE_PROFILING
+        Remotery* rmt;
+        rmt_CreateGlobalInstance(&rmt);
+#endif
+
         // UV - experimental
         uv_loop_init( &_loop );
 
@@ -93,7 +96,7 @@ public:
         _numAdditional = std::thread::hardware_concurrency() - 1;
         // cerr << "Number of additionnal threads = " << _numAdditional << endl;
         _numAdditional = 0;
-        _scheduler = std::make_shared<mew::JobScheduler>();
+        _scheduler = std::make_shared<mew::TPScheduler>();
         if( _numAdditional == 0 )
         {
             _minTimerInterval = 0.001;
@@ -283,7 +286,7 @@ public:
                         delete spub;
             }, subpub);
                 j->label() = "JOB_PUBLICATION";
-                _scheduler->push( j );
+                _scheduler->schedule( j );
 
                 /*
                 cpp::any aobj = obj;
@@ -360,10 +363,10 @@ public:
                 cref->f( aa );
                 //                cerr << "call_1" << endl;
             }
-//            else
-//            {
-//                cerr << "encore rate." << endl;
-//            }
+            //            else
+            //            {
+            //                cerr << "encore rate." << endl;
+            //            }
         };
 
         cref->async_ref = new UVAsync( &_loop, this, cref->fc );
@@ -456,9 +459,6 @@ private:
 
     // CHANNELS
     std::map< std::string, ChannelReference* > _channels;
-
-    // THREADPOOL
-    tp::ThreadPool pool;
 
 protected:
 

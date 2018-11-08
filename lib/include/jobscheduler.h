@@ -16,7 +16,7 @@ namespace mew
 
         }
 
-        bool push( Job* j )
+        virtual bool schedule( Job* j )
         {
             return false;
         }

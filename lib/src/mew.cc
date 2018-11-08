@@ -76,9 +76,9 @@ mew::Job *mew::Mew::createUVLoopJob()
     {
         Job * uvJob = new Job( []( Job* j ){
                 mew::Mew * m = (mew::Mew*)j->userData();
-                uv_run( &(m->_loop), UV_RUN_NOWAIT);
+                uv_run( &(m->_loop), UV_RUN_ONCE);
                 Job * nextJob = m->createUVLoopJob();
-                m->scheduler()->push( nextJob );
+                m->scheduler()->schedule( nextJob );
         }, this );
         uvJob->label() = "UV_UPDATE";
         return uvJob;
@@ -87,9 +87,9 @@ mew::Job *mew::Mew::createUVLoopJob()
     {
         Job * uvJob = new Job( []( Job* j ){
                 mew::Mew * m = (mew::Mew*)j->userData();
-                uv_run( &(m->_loop), UV_RUN_DEFAULT);
+                uv_run( &(m->_loop), UV_RUN_NOWAIT);
                 Job * nextJob = m->createUVLoopJob();
-                m->scheduler()->push( nextJob );
+                m->scheduler()->schedule( nextJob );
         }, this );
         uvJob->label() = "UV_UPDATE";
         return uvJob;

@@ -13,7 +13,7 @@ void mew::UVAsync::periodic()
             pref->exec();
     }, this );
     popo->label() = "ASYNC_POPO_EXECUTION";
-    _context->scheduler()->push( popo );
+    _context->scheduler()->schedule( popo );
 
 //    exec();
 

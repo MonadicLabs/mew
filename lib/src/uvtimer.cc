@@ -12,12 +12,14 @@ void mew::UVTimer::periodic()
 #ifdef MEW_USE_PROFILING
         rmt_BeginCPUSampleDynamic( "TIMER_JOB_CREATION", 0);
 #endif
+
     mew::Job * popo = new Job( []( mew::Job* j ) {
             UVTimer* tref = (UVTimer*)(j->userData());
             tref->exec();
     }, this );
     popo->label() = "TIMER_EXECUTION";
-    _context->scheduler()->push( popo );
+    _context->scheduler()->schedule( popo );
+
 #ifdef MEW_USE_PROFILING
         rmt_EndCPUSample();
 #endif

@@ -7,6 +7,8 @@
 #include <mutex>
 using namespace std;
 
+#include "mewconfig.h"
+
 #ifdef MEW_USE_PROFILING
 #include "Remotery.h"
 #endif
@@ -58,7 +60,7 @@ public:
 
     void pushChild(Job* j );
 
-    void run(JobWorker* worker)
+    void run()
     {
         // _joblock.lock();
         // _assignedWorker.store( worker );

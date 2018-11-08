@@ -3,6 +3,12 @@
 #include <atomic>
 #include <thread>
 
+#include "../mewconfig.h"
+#ifdef MEW_USE_PROFILING
+#include <sstream>
+#include "../Remotery.h"
+#endif
+
 namespace tp
 {
 
@@ -155,6 +161,12 @@ inline void Worker<Task, Queue>::threadFunc(size_t id, Worker* steal_donor)
     *detail::thread_id() = id;
 
     Task handler;
+
+#ifdef MEW_USE_PROFILING
+    std::stringstream sstr;
+    sstr << "mew_worker_" << this;
+    rmt_SetCurrentThreadName( sstr.str().c_str() );
+#endif
 
     while (m_running_flag.load(std::memory_order_relaxed))
     {
